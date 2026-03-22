@@ -1,4 +1,4 @@
-# CS310_Project_Smart_Study_Planner
+# CS310 Project Smart Study Planner
 
 A mobile application designed to transform how students prepare for exams
 
