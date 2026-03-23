@@ -15,7 +15,7 @@ Smart Study Planner is a Flutter-based mobile app that automatically generates p
 | [Name] | [ID] | Testing & Quality Assurance Lead |
 | [Name] | [ID] | Integration & Repository Lead |
 | [Name] | [ID] | Presentation & Communication Lead |
-| [Name] | [ID] | Learning & Research Lead |
+| Harun Can Yurdagül | 32092 | Learning & Research Lead |
 
 ## Tech Stack
 
