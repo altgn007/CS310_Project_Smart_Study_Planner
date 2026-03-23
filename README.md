@@ -13,7 +13,7 @@ Smart Study Planner is a Flutter-based mobile app that automatically generates p
 | Mehmet Ali Atagün | 29481 | Project Coordinator |
 | Begüm Özcan | 33854 | Documentation & Submission Lead |
 | Salih Kobaş | 30757 | Integration & Repository Lead |
-| [Name] | [ID] | Testing & Quality Assurance Lead |
+| Helin Yağmur Çağine | 22580 | Testing & Quality Assurance Lead |
 | Zeynep Sezin Apaydın | 30739 | Presentation & Communication Lead |
 | Harun Can Yurdagül | 32092 | Learning & Research Lead |
 
