@@ -20,7 +20,8 @@ Smart Study Planner is a Flutter-based mobile app that automatically generates p
 ## Tech Stack
 
 - **Framework:** Flutter (Dart)
-- **AI Integration:** LLM-based study coach
+- **AI Integration:** LLM-based study coach, OpenAI API
+- **Database:** Firebase
 
 ## Course
 
