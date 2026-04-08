@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
 import 'screens/splash/splash_screen.dart';
-import 'screens/onboarding/splash_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/auth/create_account_screen.dart';
+import 'screens/auth/login_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const SmartStudyPlannerApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SmartStudyPlannerApp extends StatelessWidget {
+  const SmartStudyPlannerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Smart Study Planner',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      initialRoute: '/splash',
+      initialRoute: SplashScreen.routeName,
       routes: {
-        '/splash': (context) => const SplashScreen(),
-        '/onboarding': (context) => const OnboardingScreen(),
+        SplashScreen.routeName: (context) => const SplashScreen(),
+        OnboardingScreen.routeName: (context) => const OnboardingScreen(),
+        CreateAccountScreen.routeName: (context) =>
+            const CreateAccountScreen(),
+        LoginScreen.routeName: (context) => const LoginScreen(),
       },
     );
   }
