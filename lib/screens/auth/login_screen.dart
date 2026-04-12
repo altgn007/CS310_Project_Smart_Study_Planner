@@ -44,6 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
+
               child: const Text('OK'),
             ),
           ],
@@ -61,6 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+              Navigator.pushReplacement(
+               context,
+               MaterialPageRoute(builder: (_) => const HomeDashboard()),
+              );
             },
             child: const Text('Continue'),
           ),
