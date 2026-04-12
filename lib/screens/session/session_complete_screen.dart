@@ -1,8 +1,8 @@
 // lib/screens/session_complete_screen.dart
 import 'package:flutter/material.dart';
-import 'home_dashboard.dart';
+import '../../data/mock_data.dart';
+import '../home/home_dashboard.dart';
 import 'daily_session_screen.dart';
-import 'mock_data.dart';
 
 class SessionCompleteScreen extends StatelessWidget {
   final Map<String, dynamic> session;

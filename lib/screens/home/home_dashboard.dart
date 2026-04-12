@@ -1,8 +1,8 @@
 // lib/screens/home_dashboard.dart
 import 'package:flutter/material.dart';
-import 'mock_data.dart';
-import 'add_course_screen.dart';
-import 'daily_session_screen.dart';
+import '../../data/mock_data.dart';
+import '../add_course/add_course_screen.dart';
+import '../session/daily_session_screen.dart';
 
 class HomeDashboard extends StatelessWidget {
   const HomeDashboard({super.key});

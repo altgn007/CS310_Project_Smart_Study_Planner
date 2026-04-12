@@ -1,7 +1,7 @@
 // lib/screens/daily_session_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'session_complete_screen.dart';
+import '../session/session_complete_screen.dart';
 
 class DailySessionScreen extends StatefulWidget {
   final Map<String, dynamic> session;

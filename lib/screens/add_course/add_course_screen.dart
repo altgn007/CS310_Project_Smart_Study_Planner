@@ -1,6 +1,7 @@
 // lib/screens/add_course_screen.dart
 import 'package:flutter/material.dart';
-import 'home_dashboard.dart';
+import '../home/home_dashboard.dart';
+import '../../data/mock_data.dart';
 
 class AddCourseScreen extends StatefulWidget {
   const AddCourseScreen({super.key});
