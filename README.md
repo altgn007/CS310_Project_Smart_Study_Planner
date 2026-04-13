@@ -27,6 +27,26 @@ Smart Study Planner is a Flutter-based mobile app that automatically generates p
 
 ![UX Flow For Mobile](images/UX_flow_readme.png)
 
+## Features
+- Personalized study schedule generation
+- AI study coach for daily guidance
+- Adaptive rescheduling for missed sessions
+- Progress tracking and dashboard view
+- Notifications for exams, streaks, and schedule changes
+- Daily session flow with completion feedback
+
+## Implemented Screens
+- **Splash:** first entry screen
+- **Onboarding:** introduces the app flow
+- **Create Account / Login:** authentication flow
+- **Home Dashboard:** overview of goals, exams, and tasks
+- **Add Course:** collects course and exam information
+- **Schedule:** shows planned study sessions
+- **AI Coach:** gives personalized study suggestions
+- **Notifications:** shows reminders and updates
+- **Profile:** account and settings management
+- **Daily Session / Session Complete:** supports focused study flow
+
 ## Course
 
 CS310 - Mobile Application Development | Spring 2025-2026
