@@ -48,13 +48,10 @@ Smart Study Planner is a Flutter-based mobile app that automatically generates p
 - **Daily Session / Session Complete:** supports focused study flow
 
 ## Screenshots
-<img width="414" height="744" alt="Ekran görüntüsü 2026-04-13 224239" src="https://github.com/user-attachments/assets/a4c003ae-8c2e-4215-86bb-6094b74aa0c3" />
-<img width="443" height="740" alt="Ekran görüntüsü 2026-04-13 224303" src="https://github.com/user-attachments/assets/cc4df554-10af-4971-820b-c06e8555a607" />
-<img width="454" height="733" alt="Ekran görüntüsü 2026-04-13 224504" src="https://github.com/user-attachments/assets/cd8006fb-4138-4370-9ec6-e86c5d157187" />
-<img width="438" height="731" alt="Ekran görüntüsü 2026-04-13 224533" src="https://github.com/user-attachments/assets/6bf9e135-0024-4a4c-8377-7e4799f560ce" />
-<img width="436" height="730" alt="Ekran görüntüsü 2026-04-13 224549" src="https://github.com/user-attachments/assets/7ec1eedc-e0ee-4d39-9b57-a79db22bdb2e" />
-<img width="433" height="733" alt="Ekran görüntüsü 2026-04-13 224605" src="https://github.com/user-attachments/assets/ae420f1b-4fa4-480e-9b4a-cbb2da8f80d0" />
-<img width="424" height="735" alt="Ekran görüntüsü 2026-04-13 224630" src="https://github.com/user-attachments/assets/bf38cbe0-b184-43a2-8557-1b6736f1a159" />
+
+<img src="https://github.com/user-attachments/assets/a4c003ae-8c2e-4215-86bb-6094b74aa0c3" width="230"/> <img src="https://github.com/user-attachments/assets/cc4df554-10af-4971-820b-c06e8555a607" width="230"/> <img src="https://github.com/user-attachments/assets/cd8006fb-4138-4370-9ec6-e86c5d157187" width="230"/>
+
+<img src="https://github.com/user-attachments/assets/6bf9e135-0ac-4a4c-8377-7e4799f560ce" width="230"/> <img src="https://github.com/user-attachments/assets/7ec1eedc-e0ee-4d39-9b57-a79db22bdb2e" width="230"/> <img src="https://github.com/user-attachments/assets/ae420f1b-4fa4-480e-9b4a-cbb2da8f80d0" width="230"/> <img src="https://github.com/user-attachments/assets/bf38cbe0-b184-43a2-8557-1b6736f1a159" width="230"/>
 
 
 ## Course
