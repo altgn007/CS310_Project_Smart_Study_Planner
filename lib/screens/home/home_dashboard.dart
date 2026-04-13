@@ -1,6 +1,7 @@
 // lib/screens/home/home_dashboard.dart
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../data/dummy_users.dart';
 import '../../models/course.dart';
 import '../../utils/app_theme.dart';
 import '../add_course/add_course_screen.dart';
@@ -38,7 +39,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
   @override
   Widget build(BuildContext context) {
     // Get logged-in user name from DummyUsersRepository if available
-    String userName = mockUserName;
+    final String userName = ModalRoute.of(context)?.settings.arguments as String?
+     ?? DummyUsersRepository.users.first.fullName;
 
     return PhoneCard(
       child: Column(

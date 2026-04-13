@@ -57,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
       HomeDashboard.routeName,
       (route) => false,
+      arguments: matchedUser!.fullName,
     );
   }
 
