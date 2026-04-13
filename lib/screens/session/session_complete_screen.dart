@@ -1,7 +1,7 @@
-// lib/screens/session_complete_screen.dart
+// lib/screens/session/session_complete_screen.dart
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
-import '../home/home_dashboard.dart';
+import '../../utils/app_theme.dart';
 import 'daily_session_screen.dart';
 
 class SessionCompleteScreen extends StatelessWidget {
@@ -19,21 +19,18 @@ class SessionCompleteScreen extends StatelessWidget {
   });
 
   String get _timeDisplay {
-    final minutes = timeSpentSeconds ~/ 60;
-    if (minutes < 60) return '${minutes}m';
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    return m == 0 ? '${h}h' : '${h}h ${m}m';
+    final m = timeSpentSeconds ~/ 60;
+    if (m < 60) return '${m}m';
+    final h = m ~/ 60;
+    final rem = m % 60;
+    return rem == 0 ? '${h}h' : '${h}h ${rem}m';
   }
 
-  // Find the next session after the current one
   Map<String, dynamic>? get _nextSession {
-    final currentIndex = mockTodaySessions.indexWhere(
+    final idx = mockTodaySessions.indexWhere(
       (s) => s['course'] == session['course'] && s['topic'] == session['topic'],
     );
-    if (currentIndex != -1 && currentIndex + 1 < mockTodaySessions.length) {
-      return mockTodaySessions[currentIndex + 1];
-    }
+    if (idx != -1 && idx + 1 < mockTodaySessions.length) return mockTodaySessions[idx + 1];
     return null;
   }
 
@@ -42,78 +39,62 @@ class SessionCompleteScreen extends StatelessWidget {
     final next = _nextSession;
     final allDone = topicsDone == totalTopics;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      body: Column(
+    return PhoneCard(
+      child: Column(
         children: [
           // Black celebration header
           Container(
-            width: double.infinity,
-            color: const Color(0xFF0D0D0D),
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 32,
-              left: 28,
-              right: 28,
-              bottom: 32,
-            ),
+            color: AppColors.black,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
             child: Column(
               children: [
                 // Completion ring
-                Container(
-                  width: 100,
-                  height: 100,
-                  margin: const EdgeInsets.only(bottom: 20),
+                SizedBox(
+                  width: 72,
+                  height: 72,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      SizedBox(
-                        width: 100,
-                        height: 100,
-                        child: CircularProgressIndicator(
-                          value: totalTopics == 0 ? 1 : topicsDone / totalTopics,
-                          strokeWidth: 6,
-                          backgroundColor: Colors.white12,
-                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                          strokeCap: StrokeCap.round,
-                        ),
+                      CircularProgressIndicator(
+                        value: totalTopics == 0 ? 1 : topicsDone / totalTopics,
+                        strokeWidth: 5,
+                        backgroundColor: Colors.white12,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        strokeCap: StrokeCap.round,
                       ),
-                      const Icon(Icons.check_rounded, color: Colors.white, size: 36),
+                      const Icon(Icons.check_rounded, color: Colors.white, size: 28),
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
                 const Text(
                   'Session Complete!',
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
-                    letterSpacing: -0.5,
+                    fontFamily: 'Sora',
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   '${session['course']} — ${session['topic']}',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+                  style: TextStyle(fontSize: 10, color: Colors.grey[500], fontFamily: 'Sora'),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 14),
                 // Stats row
                 Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.white12, width: 1),
-                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      _statCell(label: 'TIME', value: _timeDisplay, right: true),
-                      _statCell(label: 'TOPICS', value: '$topicsDone/$totalTopics', right: true),
-                      _statCell(
-                        label: 'STREAK',
-                        value: '${mockStreak + 1}🔥',
-                        color: const Color(0xFF5BE878),
-                        right: false,
-                      ),
+                      _statCell('TIME', _timeDisplay, true),
+                      _statCell('TOPICS', '$topicsDone/$totalTopics', true),
+                      _statCell('STREAK', '${mockStreak + 1}🔥', false, color: AppColors.green),
                     ],
                   ),
                 ),
@@ -124,103 +105,81 @@ class SessionCompleteScreen extends StatelessWidget {
           // Content
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: AppPadding.screen,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 14),
 
                   // Progress update
-                  _sectionTitle('${session['course']} Progress'),
-                  const SizedBox(height: 10),
+                  Text('${session['course']} PROGRESS'.toUpperCase(), style: AppTextStyles.sectionLabel),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Text('40%', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                      const SizedBox(width: 12),
+                      Text('40%', style: AppTextStyles.bodySmall),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(100),
                           child: const LinearProgressIndicator(
                             value: 0.55,
-                            backgroundColor: Color(0xFFE0E0E0),
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0D0D0D)),
-                            minHeight: 8,
+                            backgroundColor: AppColors.border,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.black),
+                            minHeight: 6,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       const Text(
                         '→ 55%',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0D0D0D),
-                        ),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
                   // Coach note
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F2),
-                      borderRadius: BorderRadius.circular(16),
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          width: 32,
-                          height: 32,
+                          width: 28,
+                          height: 28,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0D0D0D),
-                            borderRadius: BorderRadius.circular(10),
+                            color: AppColors.black,
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.person_outline, color: Colors.white, size: 18),
+                          child: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 14),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Coach',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0D0D0D),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                allDone
-                                    ? 'Great work! All topics covered. Your ${session['course']} exam prep is on track.'
-                                    : "Good progress. You covered $topicsDone of $totalTopics topics. The remaining ones have been added to tomorrow's plan.",
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            allDone
+                                ? 'Great work! All topics covered. Keep the momentum going.'
+                                : "Good progress — $topicsDone/$totalTopics topics done. Remaining topics moved to tomorrow.",
+                            style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.mutedText, fontFamily: 'Sora'),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
 
                   // Up next
                   if (next != null) ...[
-                    _sectionTitle('Up Next'),
-                    const SizedBox(height: 10),
+                    Text('UP NEXT', style: AppTextStyles.sectionLabel),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2F2),
-                        borderRadius: BorderRadius.circular(16),
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
                         children: [
@@ -230,15 +189,11 @@ class SessionCompleteScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   next['course'],
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF0D0D0D),
-                                  ),
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
                                 ),
                                 Text(
                                   '${next['time']} · ${next['duration']}',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  style: AppTextStyles.bodySmall,
                                 ),
                               ],
                             ),
@@ -246,77 +201,48 @@ class SessionCompleteScreen extends StatelessWidget {
                           GestureDetector(
                             onTap: () => Navigator.pushReplacement(
                               context,
-                              MaterialPageRoute(
-                                builder: (_) => DailySessionScreen(session: next),
-                              ),
+                              MaterialPageRoute(builder: (_) => DailySessionScreen(session: next)),
                             ),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0D0D0D),
+                                color: AppColors.black,
                                 borderRadius: BorderRadius.circular(100),
                               ),
                               child: const Text(
                                 '▶ Start',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white, fontFamily: 'Sora'),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                   ],
 
-                  // Action buttons
+                  // Buttons
                   if (next != null)
-                    _primaryBtn(
-                      label: 'Start Next Session',
-                      onTap: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DailySessionScreen(session: next),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 10),
-                  _outlineBtn(
-                    label: 'Back to Home',
-                    onTap: () => Navigator.pushAndRemoveUntil(
+                    _primaryBtn('Start Next Session', () => Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (_) => const HomeDashboard()),
-                      (route) => false,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
+                      MaterialPageRoute(builder: (_) => DailySessionScreen(session: next)),
+                    )),
+                  const SizedBox(height: 8),
+                  _outlineBtn('Back to Home', () => Navigator.pushNamedAndRemoveUntil(context, '/home', (r) => false)),
 
-                  // Partial completion link
-                  if (!allDone)
+                  if (!allDone) ...[
+                    const SizedBox(height: 10),
                     Center(
                       child: GestureDetector(
-                        onTap: () {
-                          // TODO: Navigate to AdaptiveRescheduleScreen
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (_) => const HomeDashboard()),
-                            (route) => false,
-                          );
-                        },
+                        onTap: () => Navigator.pushNamedAndRemoveUntil(context, '/home', (r) => false),
                         child: const Text(
                           "I didn't finish everything →",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF666666),
-                            decoration: TextDecoration.underline,
-                          ),
+                          style: TextStyle(fontSize: 11, color: AppColors.mutedText, decoration: TextDecoration.underline, fontFamily: 'Sora'),
                         ),
                       ),
                     ),
-                  const SizedBox(height: 32),
+                  ],
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -326,15 +252,10 @@ class SessionCompleteScreen extends StatelessWidget {
     );
   }
 
-  Widget _statCell({
-    required String label,
-    required String value,
-    required bool right,
-    Color? color,
-  }) {
+  Widget _statCell(String label, String value, bool right, {Color? color}) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           border: right ? const Border(right: BorderSide(color: Colors.white12)) : null,
         ),
@@ -343,21 +264,16 @@ class SessionCompleteScreen extends StatelessWidget {
             Text(
               value,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: color ?? Colors.white,
                 fontFamily: 'monospace',
               ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.08 * 10,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Colors.grey[500], fontFamily: 'Sora'),
             ),
           ],
         ),
@@ -365,48 +281,26 @@ class SessionCompleteScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionTitle(String text) {
-    return Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.08 * 11,
-        color: Colors.grey[600],
-      ),
-    );
-  }
+  Widget _primaryBtn(String label, VoidCallback onTap) => SizedBox(
+    width: double.infinity,
+    height: 44,
+    child: ElevatedButton(
+      onPressed: onTap,
+      style: AppDecorations.primaryButton,
+      child: Text(label, style: AppTextStyles.button),
+    ),
+  );
 
-  Widget _primaryBtn({required String label, required VoidCallback onTap}) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF0D0D0D),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-          elevation: 0,
-        ),
-        child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+  Widget _outlineBtn(String label, VoidCallback onTap) => SizedBox(
+    width: double.infinity,
+    height: 44,
+    child: OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: AppColors.border, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
-    );
-  }
-
-  Widget _outlineBtn({required String label, required VoidCallback onTap}) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF0D0D0D),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          side: const BorderSide(color: Color(0xFFE0E0E0), width: 1.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-        ),
-        child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
+      child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.black, fontFamily: 'Sora')),
+    ),
+  );
 }

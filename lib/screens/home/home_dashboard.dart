@@ -1,52 +1,93 @@
-// lib/screens/home_dashboard.dart
+// lib/screens/home/home_dashboard.dart
 import 'package:flutter/material.dart';
 import '../../data/mock_data.dart';
+import '../../models/course.dart';
+import '../../utils/app_theme.dart';
 import '../add_course/add_course_screen.dart';
 import '../session/daily_session_screen.dart';
-import '../profile/profile_screen.dart';
 
-class HomeDashboard extends StatelessWidget {
+class HomeDashboard extends StatefulWidget {
   static const String routeName = '/home';
   const HomeDashboard({super.key});
 
   @override
+  State<HomeDashboard> createState() => _HomeDashboardState();
+}
+
+class _HomeDashboardState extends State<HomeDashboard> {
+  // Convert mock data to Course model objects — this is the Card+List list
+  late List<Course> _courses;
+
+  @override
+  void initState() {
+    super.initState();
+    _courses = mockCourses.map((m) => Course.fromMap(m)).toList();
+  }
+
+  void _removeCourse(int index) {
+    setState(() => _courses.removeAt(index));
+  }
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning ☀️';
+    if (hour < 17) return 'Good Afternoon 🌤';
+    return 'Good Evening 🌙';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 24),
-                    _buildHeader(context),
-                    const SizedBox(height: 20),
-                    _buildTodayGoalsCard(context),
-                    const SizedBox(height: 20),
-                    _buildSectionTitle('Upcoming Exams'),
-                    const SizedBox(height: 12),
-                    ...mockCourses.map((c) => _buildExamRow(c)),
-                    const SizedBox(height: 20),
-                    _buildSectionTitle('Quick Actions'),
-                    const SizedBox(height: 12),
-                    _buildQuickActions(context),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+    // Get logged-in user name from DummyUsersRepository if available
+    String userName = mockUserName;
+
+    return PhoneCard(
+      child: Column(
+        children: [
+          const AppStatusBar(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: AppPadding.screen,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  _buildHeader(userName),
+                  const SizedBox(height: 16),
+                  // Network image banner
+                  _buildNetworkBanner(),
+                  const SizedBox(height: 16),
+                  _buildTodayGoalsCard(),
+                  const SizedBox(height: 16),
+                  _buildSectionTitle('My Courses'),
+                  const SizedBox(height: 10),
+                  // Card list with remove — uses Course model
+                  ..._courses.asMap().entries.map(
+                    (entry) => _buildCourseCard(entry.value, entry.key),
+                  ),
+                  if (_courses.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No courses yet. Add one below!',
+                          style: AppTextStyles.bodySmall,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  _buildQuickActions(),
+                  const SizedBox(height: 12),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          AppBottomNav(currentIndex: 0),
+        ],
       ),
-      bottomNavigationBar: _buildBottomNav(context, 0),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(String name) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -54,86 +95,112 @@ class HomeDashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Good Morning ☀️',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Text(_greeting, style: AppTextStyles.bodySmall),
               const SizedBox(height: 2),
               Text(
-                mockUserName,
+                name,
                 style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
-                  color: Color(0xFF0D0D0D),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.black,
+                  fontFamily: 'Sora',
                 ),
               ),
               Text(
-                '${mockTodaySessions.length} sessions scheduled today',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                '${mockTodaySessions.length} sessions today',
+                style: AppTextStyles.bodySmall,
               ),
             ],
           ),
         ),
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE0E0E0),
-            borderRadius: BorderRadius.circular(14),
+        // Asset image — local avatar placeholder
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset(
+            'assets/images/avatar_placeholder.png',
+            width: 40,
+            height: 40,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0E0E0),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.person_outline, color: Colors.grey, size: 20),
+            ),
           ),
-          child: const Icon(Icons.person_outline, color: Colors.grey),
         ),
       ],
     );
   }
 
-  Widget _buildTodayGoalsCard(BuildContext context) {
+  Widget _buildNetworkBanner() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.network(
+        'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=600&q=80',
+        height: 80,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black)),
+          );
+        },
+        errorBuilder: (_, __, ___) => Container(
+          height: 80,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Center(child: Icon(Icons.menu_book_outlined, color: Colors.grey)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayGoalsCard() {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0D0D),
+        color: AppColors.black,
         borderRadius: BorderRadius.circular(18),
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             "TODAY'S GOALS",
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.08 * 11,
+              letterSpacing: 0.8,
               color: Colors.grey[500],
+              fontFamily: 'Sora',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           ...mockTodaySessions.asMap().entries.map((entry) {
             final session = entry.value;
-            final colors = [
-              const Color(0xFF5BE878),
-              const Color(0xFFF5C842),
-              const Color(0xFFF58C42),
-            ];
+            final colors = [AppColors.green, AppColors.yellow, AppColors.orange];
             final dotColor = colors[entry.key % colors.length];
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => DailySessionScreen(session: session),
-                ),
+                MaterialPageRoute(builder: (_) => DailySessionScreen(session: session)),
               ),
               child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.07),
                   borderRadius: BorderRadius.circular(100),
@@ -141,29 +208,19 @@ class HomeDashboard extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 8,
-                      height: 8,
-                      margin: const EdgeInsets.only(right: 10, top: 1),
-                      decoration: BoxDecoration(
-                        color: dotColor,
-                        shape: BoxShape.circle,
-                      ),
+                      width: 7,
+                      height: 7,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
                     ),
                     Expanded(
                       child: Text(
                         '${session['course']} · ${session['topic']} · ${session['duration']}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'Sora'),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(
-                      Icons.play_arrow,
-                      color: Colors.white54,
-                      size: 16,
-                    ),
+                    const Icon(Icons.play_arrow, color: Colors.white54, size: 14),
                   ],
                 ),
               ),
@@ -175,191 +232,173 @@ class HomeDashboard extends StatelessWidget {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.06 * 11,
-        color: Colors.grey[600],
-        textBaseline: TextBaseline.alphabetic,
-      ),
-    );
+    return Text(title.toUpperCase(), style: AppTextStyles.sectionLabel);
   }
 
-  Widget _buildExamRow(Map<String, dynamic> course) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F2),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  course['name'],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0D0D0D),
+  // Card widget using Course model with remove button
+  Widget _buildCourseCard(Course course, int index) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    course.name,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.black,
+                      fontFamily: 'Sora',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  course['examDate'],
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontFamily: 'monospace',
+                  const SizedBox(height: 3),
+                  Text(
+                    'Exam: ${course.examDate}',
+                    style: AppTextStyles.bodySmall,
                   ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: course['urgent']
-                  ? const Color(0xFFFFF0F0)
-                  : const Color(0xFFF2F2F2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '${course['daysLeft']} days',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: course['urgent']
-                    ? const Color(0xFFCC2222)
-                    : Colors.grey[600],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(100),
+                          child: LinearProgressIndicator(
+                            value: course.progress,
+                            backgroundColor: AppColors.border,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.black),
+                            minHeight: 4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${(course.progress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Sora',
+                          color: AppColors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      children: [
-        _actionChip(
-          label: '+ Add Course',
-          filled: true,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddCourseScreen()),
-          ),
-        ),
-        _actionChip(label: 'View Plan', filled: false, onTap: () {}),
-        _actionChip(label: 'AI Coach', filled: false, onTap: () {}),
-      ],
-    );
-  }
-
-  Widget _actionChip({
-    required String label,
-    required bool filled,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: filled ? const Color(0xFF0D0D0D) : Colors.transparent,
-          border: filled
-              ? null
-              : Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: filled ? Colors.white : const Color(0xFF0D0D0D),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav(BuildContext context, int currentIndex) {
-    return Container(
-      height: 82,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFAFAFA),
-        border: Border(top: BorderSide(color: Color(0xFFE0E0E0), width: 1)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(
-            icon: Icons.home_rounded,
-            label: 'Home',
-            active: currentIndex == 0,
-            onTap: () {},
-          ),
-          _navItem(
-            icon: Icons.calendar_today_outlined,
-            label: 'Schedule',
-            active: currentIndex == 1,
-            onTap: () => Navigator.pushNamed(context, '/schedule'),
-          ),
-          _navItem(
-            icon: Icons.chat_bubble_outline,
-            label: 'Coach',
-            active: currentIndex == 2,
-            onTap: () => Navigator.pushNamed(context, '/coach'),
-          ),
-          _navItem(
-            icon: Icons.person_outline,
-            label: 'Profile',
-            active: currentIndex == 3,
-            onTap: () => Navigator.pushNamed(context, ProfileScreen.routeName),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem({
-    required IconData icon,
-    required String label,
-    required bool active,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? const Color(0xFF0D0D0D) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 22, color: active ? Colors.white : Colors.grey),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: active ? Colors.white : Colors.grey,
+            const SizedBox(width: 8),
+            // Days left chip
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: course.urgent ? AppColors.urgentBg : AppColors.border,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${course.daysLeft}d',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: course.urgent ? AppColors.urgent : AppColors.mutedText,
+                  fontFamily: 'Sora',
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Remove button
+            GestureDetector(
+              onTap: () => _showRemoveDialog(course.name, index),
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEDED),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.close, size: 14, color: Colors.red),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showRemoveDialog(String courseName, int index) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Remove Course', style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700)),
+        content: Text(
+          'Remove "$courseName" from your courses?',
+          style: const TextStyle(fontFamily: 'Sora'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.mutedText, fontFamily: 'Sora')),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _removeCourse(index);
+            },
+            child: const Text('Remove', style: TextStyle(color: Colors.red, fontFamily: 'Sora')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pushNamed(context, AddCourseScreen.routeName),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.black,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: const Center(
+                child: Text(
+                  '+ Add Course',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white, fontFamily: 'Sora'),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pushNamed(context, '/coach'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border, width: 1.5),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: const Center(
+                child: Text(
+                  'AI Coach',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.black, fontFamily: 'Sora'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
