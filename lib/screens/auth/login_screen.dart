@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/dummy_users.dart';
 import 'create_account_screen.dart';
+import '../home/home_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,9 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Login failed'),
-          content: const Text(
-            'Incorrect email or password. Please try again.',
-          ),
+          content: const Text('Incorrect email or password. Please try again.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -52,59 +51,35 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Login successful'),
-        content: Text('Welcome back, ${matchedUser!.fullName}!'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      HomeDashboard.routeName,
+      (route) => false,
     );
   }
 
   InputDecoration _inputDecoration({required String hintText}) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFFA0A0A0),
-        fontSize: 13,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 13),
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Color(0xFFE2E2E2),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFE2E2E2)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.black,
-        ),
+        borderSide: const BorderSide(color: Colors.black),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.red,
-        ),
+        borderSide: const BorderSide(color: Colors.red),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.red,
-        ),
+        borderSide: const BorderSide(color: Colors.red),
       ),
     );
   }
@@ -195,8 +170,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration:
-                          _inputDecoration(hintText: 'you@university.edu'),
+                      decoration: _inputDecoration(
+                        hintText: 'you@university.edu',
+                      ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your email.';
