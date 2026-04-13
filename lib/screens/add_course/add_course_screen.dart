@@ -1,9 +1,9 @@
-// lib/screens/add_course_screen.dart
+// lib/screens/add_course/add_course_screen.dart
 import 'package:flutter/material.dart';
-import '../home/home_dashboard.dart';
-import '../../data/mock_data.dart';
+import '../../utils/app_theme.dart';
 
 class AddCourseScreen extends StatefulWidget {
+  static const String routeName = '/add-course';
   const AddCourseScreen({super.key});
 
   @override
@@ -11,6 +11,7 @@ class AddCourseScreen extends StatefulWidget {
 }
 
 class _AddCourseScreenState extends State<AddCourseScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _courseController = TextEditingController();
   final _topicsController = TextEditingController();
   String _selectedPriority = 'High';
@@ -32,66 +33,118 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
       initialDate: DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF0D0D0D)),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: ThemeData.light().copyWith(
+          colorScheme: const ColorScheme.light(primary: AppColors.black),
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) setState(() => _examDate = picked);
   }
 
+  void _submit() {
+    // Validate exam date separately
+    if (_examDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an exam date.')),
+      );
+      return;
+    }
+    if (_selectedDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one study day.')),
+      );
+      return;
+    }
+
+    // Validate form fields
+    if (!_formKey.currentState!.validate()) return;
+
+    // Success — show AlertDialog
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Course Added!',
+          style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          '"${_courseController.text.trim()}" has been added. Your study plan will be generated automatically.',
+          style: const TextStyle(fontFamily: 'Sora'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // back to home
+            },
+            child: const Text(
+              'Go to Home',
+              style: TextStyle(color: AppColors.black, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+    return PhoneCard(
+      child: Column(
+        children: [
+          const AppStatusBar(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: AppPadding.screen,
+              child: Form(
+                key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 16),
+                    // Back button
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Text('←', style: TextStyle(fontSize: 22)),
+                      child: const Icon(Icons.arrow_back, size: 20, color: AppColors.black),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Add Course',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
-                        color: Color(0xFF0D0D0D),
-                      ),
-                    ),
+                    const SizedBox(height: 14),
+                    const Text('Add Course', style: AppTextStyles.heading),
                     const SizedBox(height: 4),
-                    Text(
+                    const Text(
                       "We'll build your study plan automatically",
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      style: AppTextStyles.bodySmall,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
 
-                    _label('Course Name'),
-                    _textField(_courseController, 'e.g. Mathematics'),
+                    // Course Name — with validation
+                    _label('COURSE NAME'),
+                    TextFormField(
+                      controller: _courseController,
+                      style: const TextStyle(fontSize: 13, fontFamily: 'Sora'),
+                      decoration: AppDecorations.inputField(hintText: 'e.g. Mathematics'),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Please enter a course name.';
+                        if (v.trim().length < 2) return 'Course name must be at least 2 characters.';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
 
-                    _label('Exam Date'),
+                    // Exam Date
+                    _label('EXAM DATE'),
                     GestureDetector(
                       onTap: _pickDate,
                       child: Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                         decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFE0E0E0), width: 1.5),
-                          borderRadius: BorderRadius.circular(100),
+                          color: Colors.white,
+                          border: Border.all(
+                            color: _examDate == null ? AppColors.border : AppColors.black,
+                          ),
+                          borderRadius: BorderRadius.circular(28),
                         ),
                         child: Row(
                           children: [
@@ -99,20 +152,23 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                               child: Text(
                                 _examDate == null
                                     ? 'Select date'
-                                    : '${_examDate!.day}/${_examDate!.month}/${_examDate!.year}',
+                                    : '${_examDate!.day.toString().padLeft(2, '0')}/${_examDate!.month.toString().padLeft(2, '0')}/${_examDate!.year}',
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  color: _examDate == null ? Colors.grey[400] : const Color(0xFF0D0D0D),
+                                  fontSize: 13,
+                                  fontFamily: 'Sora',
+                                  color: _examDate == null ? AppColors.hint : AppColors.black,
                                 ),
                               ),
                             ),
-                            const Text('📅', style: TextStyle(fontSize: 18)),
+                            const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.labelText),
                           ],
                         ),
                       ),
                     ),
+                    const SizedBox(height: 12),
 
-                    _label('Priority Level'),
+                    // Priority
+                    _label('PRIORITY LEVEL'),
                     Row(
                       children: ['High', 'Medium', 'Low'].map((p) {
                         final selected = _selectedPriority == p;
@@ -120,16 +176,12 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                           child: GestureDetector(
                             onTap: () => setState(() => _selectedPriority = p),
                             child: Container(
-                              margin: EdgeInsets.only(
-                                right: p == 'Low' ? 0 : 8,
-                                bottom: 16,
-                              ),
+                              margin: EdgeInsets.only(right: p == 'Low' ? 0 : 8),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: selected ? const Color(0xFF0D0D0D) : Colors.transparent,
+                                color: selected ? AppColors.black : Colors.transparent,
                                 border: Border.all(
-                                  color: selected ? const Color(0xFF0D0D0D) : const Color(0xFFE0E0E0),
-                                  width: 1.5,
+                                  color: selected ? AppColors.black : AppColors.border,
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -139,7 +191,8 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: selected ? Colors.white : const Color(0xFF0D0D0D),
+                                  fontFamily: 'Sora',
+                                  color: selected ? Colors.white : AppColors.black,
                                 ),
                               ),
                             ),
@@ -147,76 +200,79 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 12),
 
-                    _label('Topics / Chapters'),
-                    _textField(_topicsController, 'e.g. Chapter 1, Chapter 2...'),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 14, top: -8),
-                      child: Text(
-                        'Separate topics with commas',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
+                    // Topics — with validation
+                    _label('TOPICS / CHAPTERS'),
+                    TextFormField(
+                      controller: _topicsController,
+                      style: const TextStyle(fontSize: 13, fontFamily: 'Sora'),
+                      decoration: AppDecorations.inputField(hintText: 'e.g. Chapter 1, Chapter 2...'),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Please enter at least one topic.';
+                        return null;
+                      },
                     ),
+                    const Text(
+                      'Separate topics with commas',
+                      style: TextStyle(fontSize: 10, color: AppColors.mutedText, fontFamily: 'Sora'),
+                    ),
+                    const SizedBox(height: 12),
 
-                    _label('Daily Study Hours Available'),
+                    // Daily hours slider
+                    _label('DAILY STUDY HOURS'),
                     Slider(
                       value: _dailyHours,
                       min: 0.5,
                       max: 6.0,
                       divisions: 11,
-                      activeColor: const Color(0xFF0D0D0D),
-                      inactiveColor: const Color(0xFFE0E0E0),
+                      activeColor: AppColors.black,
+                      inactiveColor: AppColors.border,
                       onChanged: (v) => setState(() => _dailyHours = v),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('0.5h', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                          Text(
-                            '${_dailyHours.toStringAsFixed(1)}h',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                          ),
-                          Text('6h', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                        ],
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('0.5h', style: TextStyle(fontSize: 10, color: AppColors.mutedText, fontFamily: 'Sora')),
+                        Text(
+                          '${_dailyHours.toStringAsFixed(1)}h',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
+                        ),
+                        const Text('6h', style: TextStyle(fontSize: 10, color: AppColors.mutedText, fontFamily: 'Sora')),
+                      ],
                     ),
+                    const SizedBox(height: 12),
 
-                    _label('Study Days'),
+                    // Study days
+                    _label('STUDY DAYS'),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: _allDays.map((day) {
                         final selected = _selectedDays.contains(day);
                         return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              if (selected) {
-                                _selectedDays.remove(day);
-                              } else {
-                                _selectedDays.add(day);
-                              }
-                            });
-                          },
+                          onTap: () => setState(() {
+                            selected ? _selectedDays.remove(day) : _selectedDays.add(day);
+                          }),
                           child: Container(
-                            width: 40,
-                            height: 40,
+                            width: 34,
+                            height: 34,
                             decoration: BoxDecoration(
-                              color: selected ? const Color(0xFF0D0D0D) : Colors.transparent,
+                              color: selected ? AppColors.black : Colors.transparent,
                               border: Border.all(
-                                color: selected ? const Color(0xFF0D0D0D) : const Color(0xFFE0E0E0),
-                                width: 1.5,
+                                color: selected ? AppColors.black : AppColors.border,
                               ),
                               shape: BoxShape.circle,
                             ),
                             child: Center(
                               child: Text(
-                                day.substring(0, 1),
+                                day[0],
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: selected ? Colors.white : const Color(0xFF0D0D0D),
+                                  fontFamily: 'Sora',
+                                  color: selected ? Colors.white : AppColors.black,
                                 ),
                               ),
                             ),
@@ -224,81 +280,32 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 22),
 
                     SizedBox(
                       width: double.infinity,
+                      height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // TODO: Save to Firebase
-                          // For now navigate back to home
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (_) => const HomeDashboard()),
-                            (route) => false,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D0D0D),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Generate Study Plan',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                        ),
+                        onPressed: _submit,
+                        style: AppDecorations.primaryButton,
+                        child: const Text('Generate Study Plan', style: AppTextStyles.button),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _label(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.08 * 11,
-          color: Colors.grey[600],
-        ),
-      ),
-    );
-  }
-
-  Widget _textField(TextEditingController controller, String hint) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      child: TextField(
-        controller: controller,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF0D0D0D)),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(100),
-            borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1.5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(100),
-            borderSide: const BorderSide(color: Color(0xFF0D0D0D), width: 1.5),
-          ),
-        ),
-      ),
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+      child: Text(text, style: AppTextStyles.label),
     );
   }
 }

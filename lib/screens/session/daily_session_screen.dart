@@ -1,9 +1,11 @@
-// lib/screens/daily_session_screen.dart
+// lib/screens/session/daily_session_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../session/session_complete_screen.dart';
+import '../../utils/app_theme.dart';
+import 'session_complete_screen.dart';
 
 class DailySessionScreen extends StatefulWidget {
+  static const String routeName = '/session';
   final Map<String, dynamic> session;
   const DailySessionScreen({super.key, required this.session});
 
@@ -58,16 +60,12 @@ class _DailySessionScreenState extends State<DailySessionScreen> {
   }
 
   String get _timerDisplay {
-    final minutes = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
-    final seconds = (_secondsLeft % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
+    final m = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
+    final s = (_secondsLeft % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   int get _doneTopics => _topics.where((t) => t['done'] == true).length;
-
-  void _toggleTopic(int index) {
-    setState(() => _topics[index]['done'] = !(_topics[index]['done'] as bool));
-  }
 
   void _markComplete() {
     _timer?.cancel();
@@ -88,219 +86,179 @@ class _DailySessionScreenState extends State<DailySessionScreen> {
   Widget build(BuildContext context) {
     final progress = _topics.isEmpty ? 0.0 : _doneTopics / _topics.length;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Text('←', style: TextStyle(fontSize: 22)),
+    return PhoneCard(
+      child: Column(
+        children: [
+          const AppStatusBar(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: AppPadding.screen,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const Icon(Icons.arrow_back, size: 20, color: AppColors.black),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Timer block
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppColors.black,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    const SizedBox(height: 8),
-
-                    // Timer block
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D0D0D),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        children: [
-                          Text(
-                            'FOCUS SESSION',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.1 * 11,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _timerDisplay,
-                            style: const TextStyle(
-                              fontSize: 56,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'monospace',
-                              letterSpacing: -2,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            '${widget.session['course']} — ${widget.session['topic']}',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                          ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _timerBtn(
-                                icon: Icons.stop_rounded,
-                                color: Colors.white24,
-                                iconColor: Colors.white60,
-                                onTap: _resetTimer,
-                              ),
-                              const SizedBox(width: 12),
-                              _timerBtn(
-                                icon: _isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                                iconColor: const Color(0xFF0D0D0D),
-                                onTap: _toggleTimer,
-                                large: true,
-                              ),
-                              const SizedBox(width: 12),
-                              _timerBtn(
-                                icon: Icons.refresh_rounded,
-                                color: Colors.white24,
-                                iconColor: Colors.white60,
-                                onTap: _resetTimer,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    _sectionTitle('Session Topics'),
-                    const SizedBox(height: 8),
-                    ..._topics.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final topic = entry.value;
-                      final done = topic['done'] as bool;
-                      return GestureDetector(
-                        onTap: () => _toggleTopic(i),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  color: done ? const Color(0xFF0D0D0D) : Colors.transparent,
-                                  border: Border.all(
-                                    color: done ? const Color(0xFF0D0D0D) : const Color(0xFFE0E0E0),
-                                    width: 1.5,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: done
-                                    ? const Icon(Icons.check, size: 13, color: Colors.white)
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                topic['title'],
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  color: done ? Colors.grey[400] : const Color(0xFF0D0D0D),
-                                  decoration: done ? TextDecoration.lineThrough : null,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-
-                    const SizedBox(height: 20),
-                    _sectionTitle('Session Progress'),
-                    const SizedBox(height: 8),
-                    Row(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(100),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              backgroundColor: const Color(0xFFE0E0E0),
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0D0D0D)),
-                              minHeight: 8,
-                            ),
+                        Text(
+                          'FOCUS SESSION',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.8,
+                            color: Colors.grey[500],
+                            fontFamily: 'Sora',
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(height: 6),
                         Text(
-                          '$_doneTopics/${_topics.length}',
+                          _timerDisplay,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 44,
                             fontWeight: FontWeight.w700,
                             fontFamily: 'monospace',
+                            letterSpacing: -2,
+                            color: Colors.white,
                           ),
+                        ),
+                        Text(
+                          '${widget.session['course']} — ${widget.session['topic']}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 10, color: Colors.grey[500], fontFamily: 'Sora'),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _timerBtn(Icons.stop_rounded, Colors.white24, Colors.white60, _resetTimer),
+                            const SizedBox(width: 10),
+                            _timerBtn(
+                              _isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              Colors.white,
+                              AppColors.black,
+                              _toggleTimer,
+                              large: true,
+                            ),
+                            const SizedBox(width: 10),
+                            _timerBtn(Icons.refresh_rounded, Colors.white24, Colors.white60, _resetTimer),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 28),
+                  ),
+                  const SizedBox(height: 16),
 
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _markComplete,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D0D0D),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Mark Session Complete',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  Text('SESSION TOPICS', style: AppTextStyles.sectionLabel),
+                  const SizedBox(height: 8),
+                  ..._topics.asMap().entries.map((e) {
+                    final done = e.value['done'] as bool;
+                    return GestureDetector(
+                      onTap: () => setState(() => _topics[e.key]['done'] = !done),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: done ? AppColors.black : Colors.transparent,
+                                border: Border.all(
+                                  color: done ? AppColors.black : AppColors.border,
+                                  width: 1.5,
+                                ),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: done
+                                  ? const Icon(Icons.check, size: 12, color: Colors.white)
+                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              e.value['title'],
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Sora',
+                                color: done ? AppColors.mutedText : AppColors.black,
+                                decoration: done ? TextDecoration.lineThrough : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                    );
+                  }),
+
+                  const SizedBox(height: 14),
+                  Text('PROGRESS', style: AppTextStyles.sectionLabel),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(100),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            backgroundColor: AppColors.border,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.black),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '$_doneTopics/${_topics.length}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _markComplete,
+                      style: AppDecorations.primaryButton,
+                      child: const Text('Mark Session Complete', style: AppTextStyles.button),
                     ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _sectionTitle(String text) {
-    return Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.08 * 11,
-        color: Colors.grey[600],
-      ),
-    );
-  }
-
-  Widget _timerBtn({
-    required IconData icon,
-    required Color color,
-    required Color iconColor,
-    required VoidCallback onTap,
-    bool large = false,
-  }) {
-    final size = large ? 52.0 : 44.0;
+  Widget _timerBtn(IconData icon, Color bg, Color iconColor, VoidCallback onTap, {bool large = false}) {
+    final size = large ? 44.0 : 36.0;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: Icon(icon, color: iconColor, size: large ? 26 : 20),
+        decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+        child: Icon(icon, color: iconColor, size: large ? 22 : 17),
       ),
     );
   }
