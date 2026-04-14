@@ -49,9 +49,8 @@ Smart Study Planner is a Flutter-based mobile app that automatically generates p
 
 ## Screenshots
 
-<img src="https://github.com/user-attachments/assets/dcd9df98-52b6-4ab3-89a0-6024ad289e09" width="220" height="380"/> <img src="https://github.com/user-attachments/assets/b754aab9-89bf-4a6f-8482-39ec27ea0a2b" width="220" height="380"/> <img src="https://github.com/user-attachments/assets/41ee9ccc-8a2d-4bed-834a-c1ccf04e77eb" width="220" height="380"/> <img src="https://github.com/user-attachments/assets/cf408ad7-b63d-493d-a346-aac1e542d5b4" width="220" height="380"/>
+![UI And UX ](https://github.com/user-attachments/assets/3ca5b67e-bd0d-4e10-b719-be0d1c21dd05)
 
-<img src="https://github.com/user-attachments/assets/4d214c3e-e557-4e4b-a02a-13be8ab74e68" width="220" height="380"/> <img src="https://github.com/user-attachments/assets/9b8394fc-c604-4cd6-912d-ff01f2e4730f" width="220" height="380"/> <img src="https://github.com/user-attachments/assets/cdfe944b-53eb-42dc-aba6-44fb2e6db17b" width="220" height="380"/> <img src="https://github.com/user-attachments/assets/184654d0-ce75-44c1-84cc-fbf4a05d5bde" width="220" height="380"/>
 
 
 
