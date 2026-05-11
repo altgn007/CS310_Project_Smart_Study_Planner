@@ -103,4 +103,23 @@ class Course {
       createdAt: createdTs is Timestamp ? createdTs.toDate() : DateTime.now(),
     );
   }
+
+  factory Course.fromMap(Map<String, dynamic> data) {
+    return Course(
+      id: data['id'] as String? ?? '',
+      name: data['name'] as String? ?? '',
+      examDate: data['examDate'] is DateTime
+          ? data['examDate'] as DateTime
+          : DateTime.now(),
+      priority: data['priority'] as String? ?? 'Medium',
+      topics: List<String>.from(data['topics'] as List? ?? const []),
+      dailyHours: (data['dailyHours'] as num?)?.toDouble() ?? 2.0,
+      studyDays: List<String>.from(data['studyDays'] as List? ?? const []),
+      progress: (data['progress'] as num?)?.toDouble() ?? 0.0,
+      createdBy: data['createdBy'] as String? ?? '',
+      createdAt: data['createdAt'] is DateTime
+          ? data['createdAt'] as DateTime
+          : DateTime.now(),
+    );
+  }
 }
