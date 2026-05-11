@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users ────────────────────────────────────────────────────────────
+    // Each user may only read and write their own profile document.
+    // The document id equals the Firebase Auth uid.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── Courses ──────────────────────────────────────────────────────────
+    // A course is private to the user who created it.
+    match /courses/{courseId} {
+      allow read, update, delete: if request.auth != null
+        && request.auth.uid == resource.data.createdBy;
+
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.createdBy
+        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
+    }
+
+    // ── Sessions ─────────────────────────────────────────────────────────
+    match /sessions/{sessionId} {
+      allow read, update, delete: if request.auth != null
+        && request.auth.uid == resource.data.createdBy;
+
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.createdBy
+        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read, update, delete: if request.auth != null
+        && request.auth.uid == resource.data.createdBy;
+
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.createdBy
+        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
+    }
+
+    // ── Chats ─────────────────────────────────────────────────────────────
+    match /chats/{chatId} {
+      allow read, delete: if request.auth != null
+        && request.auth.uid == resource.data.createdBy;
+
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.createdBy
+        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
