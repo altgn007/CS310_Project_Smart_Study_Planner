@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_users.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
 
 class CreateAccountScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   String? _selectedDate;
   String _selectedEducationLevel = 'University';
+  bool _isLoading = false;
 
   final List<String> _educationLevels = [
     'High School',
@@ -51,69 +53,44 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     }
   }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
     final bool isFormValid = _formKey.currentState!.validate();
 
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select your date of birth.'),
-        ),
+        const SnackBar(content: Text('Please select your date of birth.')),
       );
       return;
     }
 
     if (!isFormValid) return;
 
-    final String email = _emailController.text.trim();
+    setState(() => _isLoading = true);
 
-    if (DummyUsersRepository.emailExists(email)) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Account already exists'),
-          content: const Text(
-            'An account with this email already exists. Please use another email.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    final DummyUser newUser = DummyUser(
-      fullName: _fullNameController.text.trim(),
-      email: email,
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signUp(
+      email: _emailController.text.trim(),
       password: _passwordController.text.trim(),
-      dateOfBirth: _selectedDate!,
+      fullName: _fullNameController.text.trim(),
       educationLevel: _selectedEducationLevel,
+      dateOfBirth: _selectedDate,
     );
 
-    DummyUsersRepository.addUser(newUser);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Account created'),
-        content: const Text(
-          'Your account has been created successfully.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.errorMessage ?? 'Sign up failed.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account created successfully!')),
+      );
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/auth-gate');
+    }
   }
 
   InputDecoration _inputDecoration({
@@ -122,40 +99,26 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFFA0A0A0),
-        fontSize: 13,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 13),
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Color(0xFFE2E2E2),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFE2E2E2)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.black,
-        ),
+        borderSide: const BorderSide(color: Colors.black),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.red,
-        ),
+        borderSide: const BorderSide(color: Colors.red),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.red,
-        ),
+        borderSide: const BorderSide(color: Colors.red),
       ),
     );
   }
@@ -246,9 +209,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-                          },
+                          onTap: () => Navigator.pushReplacementNamed(
+                            context,
+                            LoginScreen.routeName,
+                          ),
                           child: const Text(
                             'Log in here.',
                             style: TextStyle(
@@ -280,14 +244,14 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration:
-                          _inputDecoration(hintText: 'you@university.edu'),
+                      decoration: _inputDecoration(
+                        hintText: 'you@university.edu',
+                      ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your email.';
                         }
-                        final emailRegex =
-                            RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                        final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
                         if (!emailRegex.hasMatch(value.trim())) {
                           return 'Please enter a valid email.';
                         }
@@ -330,7 +294,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     const SizedBox(height: 14),
                     _buildLabel('EDUCATION LEVEL'),
                     DropdownButtonFormField<String>(
-                      value: _selectedEducationLevel,
+                      initialValue: _selectedEducationLevel,
                       decoration: _inputDecoration(hintText: 'University'),
                       icon: const Icon(
                         Icons.keyboard_arrow_down_rounded,
@@ -347,9 +311,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         );
                       }).toList(),
                       onChanged: (value) {
-                        setState(() {
-                          _selectedEducationLevel = value!;
-                        });
+                        setState(() => _selectedEducationLevel = value!);
                       },
                     ),
                     const SizedBox(height: 22),
@@ -357,7 +319,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _submitForm,
+                        onPressed: _isLoading ? null : _submitForm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -366,13 +328,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                             borderRadius: BorderRadius.circular(28),
                           ),
                         ),
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                'Sign Up',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ],
