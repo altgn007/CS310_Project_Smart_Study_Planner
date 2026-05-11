@@ -1,33 +1,18 @@
 // lib/screens/home/home_dashboard.dart
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
-import '../../data/dummy_users.dart';
+import 'package:provider/provider.dart';
 import '../../models/course.dart';
+import '../../models/study_session.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/course_provider.dart';
+import '../../providers/session_provider.dart';
 import '../../utils/app_theme.dart';
 import '../add_course/add_course_screen.dart';
 import '../session/daily_session_screen.dart';
 
-class HomeDashboard extends StatefulWidget {
+class HomeDashboard extends StatelessWidget {
   static const String routeName = '/home';
   const HomeDashboard({super.key});
-
-  @override
-  State<HomeDashboard> createState() => _HomeDashboardState();
-}
-
-class _HomeDashboardState extends State<HomeDashboard> {
-  // Convert mock data to Course model objects — this is the Card+List list
-  late List<Course> _courses;
-
-  @override
-  void initState() {
-    super.initState();
-    _courses = mockCourses.map((m) => Course.fromMap(m)).toList();
-  }
-
-  void _removeCourse(int index) {
-    setState(() => _courses.removeAt(index));
-  }
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -38,9 +23,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // Get logged-in user name from DummyUsersRepository if available
-    final String userName = ModalRoute.of(context)?.settings.arguments as String?
-     ?? DummyUsersRepository.users.first.fullName;
+    final displayName = context.watch<AuthProvider>().displayName;
 
     return PhoneCard(
       child: Column(
@@ -53,31 +36,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  _buildHeader(userName),
+                  _buildHeader(context, displayName),
                   const SizedBox(height: 16),
-                  // Network image banner
                   _buildNetworkBanner(),
                   const SizedBox(height: 16),
-                  _buildTodayGoalsCard(),
+                  _buildTodayGoalsCard(context),
                   const SizedBox(height: 16),
                   _buildSectionTitle('My Courses'),
                   const SizedBox(height: 10),
-                  // Card list with remove — uses Course model
-                  ..._courses.asMap().entries.map(
-                    (entry) => _buildCourseCard(entry.value, entry.key),
-                  ),
-                  if (_courses.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'No courses yet. Add one below!',
-                          style: AppTextStyles.bodySmall,
-                        ),
-                      ),
-                    ),
+                  _buildCourseList(context),
                   const SizedBox(height: 16),
-                  _buildQuickActions(),
+                  _buildQuickActions(context),
                   const SizedBox(height: 12),
                 ],
               ),
@@ -89,52 +58,57 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  Widget _buildHeader(String name) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_greeting, style: AppTextStyles.bodySmall),
-              const SizedBox(height: 2),
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.black,
-                  fontFamily: 'Sora',
+  Widget _buildHeader(BuildContext context, String name) {
+    return StreamBuilder<List<StudySession>>(
+      stream: context.read<SessionProvider>().todaySessionsStream,
+      builder: (context, snap) {
+        final count = snap.data?.length ?? 0;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_greeting, style: AppTextStyles.bodySmall),
+                  const SizedBox(height: 2),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.black,
+                      fontFamily: 'Sora',
+                    ),
+                  ),
+                  Text(
+                    '$count session${count == 1 ? '' : 's'} today',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/images/avatar_placeholder.png',
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E0E0),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.person_outline, color: Colors.grey, size: 20),
                 ),
               ),
-              Text(
-                '${mockTodaySessions.length} sessions today',
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
-          ),
-        ),
-        // Asset image — local avatar placeholder
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.asset(
-            'assets/images/avatar_placeholder.png',
-            width: 40,
-            height: 40,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0E0E0),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.person_outline, color: Colors.grey, size: 20),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -154,7 +128,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black)),
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
+            ),
           );
         },
         errorBuilder: (_, __, ___) => Container(
@@ -169,67 +145,100 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  Widget _buildTodayGoalsCard() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.black,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "TODAY'S GOALS",
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
-              color: Colors.grey[500],
-              fontFamily: 'Sora',
+  Widget _buildTodayGoalsCard(BuildContext context) {
+    return StreamBuilder<List<StudySession>>(
+      stream: context.read<SessionProvider>().todaySessionsStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.black,
+              borderRadius: BorderRadius.circular(18),
             ),
+            padding: const EdgeInsets.all(16),
+            child: const Center(
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            ),
+          );
+        }
+
+        final sessions = snap.data ?? [];
+
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.black,
+            borderRadius: BorderRadius.circular(18),
           ),
-          const SizedBox(height: 10),
-          ...mockTodaySessions.asMap().entries.map((entry) {
-            final session = entry.value;
-            final colors = [AppColors.green, AppColors.yellow, AppColors.orange];
-            final dotColor = colors[entry.key % colors.length];
-            return GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => DailySessionScreen(session: session)),
-              ),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(100),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "TODAY'S GOALS",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.8,
+                  color: Colors.grey[500],
+                  fontFamily: 'Sora',
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-                    ),
-                    Expanded(
-                      child: Text(
-                        '${session['course']} · ${session['topic']} · ${session['duration']}',
-                        style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'Sora'),
-                        overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 10),
+              if (sessions.isEmpty)
+                Text(
+                  'No sessions scheduled for today.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500], fontFamily: 'Sora'),
+                )
+              else
+                ...sessions.asMap().entries.map((entry) {
+                  final session = entry.value;
+                  final colors = [AppColors.green, AppColors.yellow, AppColors.orange];
+                  final dotColor = colors[entry.key % colors.length];
+                  return GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DailySessionScreen(session: session.toSessionMap()),
                       ),
                     ),
-                    const Icon(Icons.play_arrow, color: Colors.white54, size: 14),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.07),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '${session.courseName} · ${session.topic} · ${session.duration}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                                fontFamily: 'Sora',
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const Icon(Icons.play_arrow, color: Colors.white54, size: 14),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -237,8 +246,47 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return Text(title.toUpperCase(), style: AppTextStyles.sectionLabel);
   }
 
-  // Card widget using Course model with remove button
-  Widget _buildCourseCard(Course course, int index) {
+  Widget _buildCourseList(BuildContext context) {
+    return StreamBuilder<List<Course>>(
+      stream: context.read<CourseProvider>().coursesStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
+            ),
+          );
+        }
+
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text('Error loading courses.', style: AppTextStyles.bodySmall),
+          );
+        }
+
+        final courses = snap.data ?? [];
+
+        if (courses.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('No courses yet. Add one below!', style: AppTextStyles.bodySmall),
+            ),
+          );
+        }
+
+        return Column(
+          children: courses
+              .map((course) => _buildCourseCard(context, course))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildCourseCard(BuildContext context, Course course) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
@@ -263,7 +311,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Exam: ${course.examDate}',
+                    'Exam: ${_formatDate(course.examDate)}',
                     style: AppTextStyles.bodySmall,
                   ),
                   const SizedBox(height: 6),
@@ -296,7 +344,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
               ),
             ),
             const SizedBox(width: 8),
-            // Days left chip
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -314,9 +361,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
               ),
             ),
             const SizedBox(width: 6),
-            // Remove button
             GestureDetector(
-              onTap: () => _showRemoveDialog(course.name, index),
+              onTap: () => _showRemoveDialog(context, course),
               child: Container(
                 width: 26,
                 height: 26,
@@ -333,34 +379,43 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  void _showRemoveDialog(String courseName, int index) {
+  void _showRemoveDialog(BuildContext context, Course course) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Remove Course', style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700)),
+        title: const Text(
+          'Remove Course',
+          style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
+        ),
         content: Text(
-          'Remove "$courseName" from your courses?',
+          'Remove "${course.name}" from your courses?',
           style: const TextStyle(fontFamily: 'Sora'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.mutedText, fontFamily: 'Sora')),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.mutedText, fontFamily: 'Sora'),
+            ),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _removeCourse(index);
+              context.read<CourseProvider>().deleteCourse(course.id);
             },
-            child: const Text('Remove', style: TextStyle(color: Colors.red, fontFamily: 'Sora')),
+            child: const Text(
+              'Remove',
+              style: TextStyle(color: Colors.red, fontFamily: 'Sora'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(BuildContext context) {
     return Row(
       children: [
         Expanded(
@@ -375,7 +430,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
               child: const Center(
                 child: Text(
                   '+ Add Course',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white, fontFamily: 'Sora'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontFamily: 'Sora',
+                  ),
                 ),
               ),
             ),
@@ -394,7 +454,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
               child: const Center(
                 child: Text(
                   'AI Coach',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.black, fontFamily: 'Sora'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.black,
+                    fontFamily: 'Sora',
+                  ),
                 ),
               ),
             ),
@@ -402,5 +467,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
         ),
       ],
     );
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}';
   }
 }

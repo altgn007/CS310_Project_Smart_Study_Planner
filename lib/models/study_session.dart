@@ -95,6 +95,17 @@ class StudySession {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
+  /// Converts to the Map shape expected by [DailySessionScreen].
+  Map<String, dynamic> toSessionMap() => {
+        'course': courseName,
+        'topic': topic,
+        'time': time,
+        'duration': duration,
+        'urgent': urgent,
+        'done': done,
+        'topics': topics.map((t) => t.toMap()).toList(),
+      };
+
   factory StudySession.fromFirestore(
       DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
