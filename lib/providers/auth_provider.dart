@@ -8,24 +8,12 @@ import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 
-/// Centralizes the app's authentication state.
-///
-/// Exposes:
-///   - [user]       → current Firebase auth user (raw),
-///   - [profile]    → cached [AppUser] from Firestore (full name etc.),
-///   - [isLoading]  → true while a sign-in / sign-up is in flight.
-///
-/// The provider listens to `authStateChanges` so the UI rebuilds automatically
-/// when the user logs in, logs out, or the token refreshes.
 class AuthProvider extends ChangeNotifier {
   AuthProvider({
     required AuthService authService,
     required FirestoreService firestoreService,
-  })  : _auth = authService,
-        _firestore = firestoreService {
-    // Subscribe to FirebaseAuth state changes for the lifetime of this provider.
-    // Whenever the auth state flips we refresh the cached profile and notify
-    // listeners — that's what drives the AuthGate redraw.
+  }) : _auth = authService,
+       _firestore = firestoreService {
     _authSub = _auth.authStateChanges().listen(_onAuthChanged);
   }
 
@@ -40,15 +28,12 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
-  // ── Public state ────────────────────────────────────────────────────
   User? get user => _user;
   AppUser? get profile => _profile;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _user != null;
   String? get errorMessage => _errorMessage;
 
-  /// Best-effort display name. Falls back to the email's local-part if the
-  /// profile hasn't loaded yet.
   String get displayName {
     if (_profile != null && _profile!.fullName.trim().isNotEmpty) {
       return _profile!.fullName;
@@ -60,11 +45,8 @@ class AuthProvider extends ChangeNotifier {
     return 'there';
   }
 
-  // ── Internal handlers ───────────────────────────────────────────────
   void _onAuthChanged(User? user) {
     _user = user;
-    // Tear down any existing profile listener so we don't leak streams
-    // when the user signs out and back in as someone else.
     _profileSub?.cancel();
     _profileSub = null;
     _profile = null;
@@ -79,7 +61,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Actions ─────────────────────────────────────────────────────────
   Future<bool> signIn({required String email, required String password}) async {
     _setLoading(true);
     _errorMessage = null;
@@ -94,9 +75,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Sign up + create the corresponding Firestore profile document.
-  /// If profile creation fails we still leave the user signed in — they can
-  /// retry editing their profile rather than being locked out.
   Future<bool> signUp({
     required String email,
     required String password,
@@ -107,8 +85,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     try {
-      final user =
-          await _auth.signUp(email: email, password: password);
+      final user = await _auth.signUp(email: email, password: password);
       final appUser = AppUser(
         id: user.uid,
         email: email.trim(),
