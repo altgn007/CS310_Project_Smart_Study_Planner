@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../onboarding/onboarding_screen.dart';
+import 'package:smart_study_planner/widgets/auth_gate.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
           // Sonraki sayfaya geçiş
           // Burayı kendi route yapına göre değiştir
-          Navigator.pushReplacementNamed(context, OnboardingScreen.routeName);
+          Navigator.pushReplacementNamed(context, AuthGate.routeName);
         });
       }
     });
