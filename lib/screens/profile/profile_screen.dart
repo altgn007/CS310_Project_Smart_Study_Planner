@@ -1,42 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:smart_study_planner/screens/notifications/notifications_screen.dart';
-import '../../data/dummy_users.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/course_provider.dart';
+import '../notifications/notifications_screen.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   static const String routeName = '/profile';
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  // Using first user as the logged-in user for now
-  DummyUser get _currentUser => DummyUsersRepository.users.first;
-
-  void _handleLogout() {
+  void _handleLogout(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Log out'),
         content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF7A7A7A)),
-            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF7A7A7A))),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await context.read<AuthProvider>().signOut();
+              // AuthGate handles redirect to login automatically.
             },
             child: const Text('Log Out', style: TextStyle(color: Colors.red)),
           ),
@@ -45,15 +33,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showComingSoon(String feature) {
+  void _showComingSoon(BuildContext context, String feature) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(feature),
         content: const Text('This feature is not available yet.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('OK'),
           ),
         ],
@@ -63,6 +51,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final profile = auth.profile;
+    final courseCount = context.watch<CourseProvider>().courses.length;
+
+    final String displayName = auth.displayName;
+    final String subtitle =
+        profile != null ? '${profile.educationLevel} Student' : 'Student';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: SafeArea(
@@ -87,10 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   // Status bar
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
@@ -107,14 +100,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
 
-                  // Scrollable content
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Page title
                           const Text(
                             'Profile',
                             style: TextStyle(
@@ -123,10 +114,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: Colors.black,
                             ),
                           ),
-
                           const SizedBox(height: 16),
 
-                          // Avatar + name + subtitle
+                          // Avatar + name
                           Center(
                             child: Column(
                               children: [
@@ -137,15 +127,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     color: const Color(0xFF111111),
                                     borderRadius: BorderRadius.circular(16),
                                   ),
-                                  child: const Icon(
-                                    Icons.person,
-                                    color: Colors.white,
-                                    size: 28,
-                                  ),
+                                  child: const Icon(Icons.person, color: Colors.white, size: 28),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  _currentUser.fullName,
+                                  displayName,
                                   style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
@@ -154,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${_currentUser.educationLevel} Student · Istanbul',
+                                  subtitle,
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Color(0xFF8A8A8A),
@@ -163,10 +149,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ],
                             ),
                           ),
-
                           const SizedBox(height: 16),
 
-                          // Stats row
+                          // Stats row — course count is live from CourseProvider
                           Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
@@ -175,80 +160,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: const [
-                                _StatItem(value: '3', label: 'Courses'),
-                                _Divider(),
-                                _StatItem(value: '27', label: 'Day Streak'),
-                                _Divider(),
-                                _StatItem(value: '12h', label: 'This Week'),
+                              children: [
+                                _StatItem(value: '$courseCount', label: 'Courses'),
+                                const _Divider(),
+                                const _StatItem(value: '—', label: 'Day Streak'),
+                                const _Divider(),
+                                const _StatItem(value: '—', label: 'This Week'),
                               ],
                             ),
                           ),
-
                           const SizedBox(height: 18),
 
                           // ACCOUNT section
-                          _SectionLabel(text: 'ACCOUNT'),
+                          const _SectionLabel(text: 'ACCOUNT'),
                           const SizedBox(height: 8),
                           _SettingsItem(
                             icon: Icons.person_outline,
                             title: 'Edit Profile',
                             subtitle: 'Name, email, photo',
-                            onTap: () => _showComingSoon('Edit Profile'),
+                            onTap: () => _showComingSoon(context, 'Edit Profile'),
                           ),
                           _SettingsItem(
                             icon: Icons.notifications_none_outlined,
                             title: 'Notifications',
                             subtitle: 'Reminders, alerts',
-                            onTap: () {
-                              Navigator.pushNamed(
-                                context,
-                                NotificationsScreen.routeName,
-                              );
-                            },
+                            onTap: () => Navigator.pushNamed(
+                              context,
+                              NotificationsScreen.routeName,
+                            ),
                           ),
-
                           const SizedBox(height: 14),
 
                           // GENERAL SETTINGS section
-                          _SectionLabel(text: 'GENERAL SETTINGS'),
+                          const _SectionLabel(text: 'GENERAL SETTINGS'),
                           const SizedBox(height: 8),
                           _SettingsItem(
                             icon: Icons.contrast_outlined,
                             title: 'Appearance',
                             subtitle: 'Light / Dark mode',
-                            onTap: () => _showComingSoon('Appearance'),
+                            onTap: () => _showComingSoon(context, 'Appearance'),
                           ),
                           _SettingsItem(
                             icon: Icons.language_outlined,
                             title: 'Language',
                             subtitle: 'English',
-                            onTap: () => _showComingSoon('Language'),
+                            onTap: () => _showComingSoon(context, 'Language'),
                           ),
                           _SettingsItem(
                             icon: Icons.info_outline,
                             title: 'Terms & Conditions',
-                            onTap: () => _showComingSoon('Terms & Conditions'),
+                            onTap: () => _showComingSoon(context, 'Terms & Conditions'),
                           ),
                           _SettingsItem(
                             icon: Icons.lock_outline,
                             title: 'Privacy Policy',
-                            onTap: () => _showComingSoon('Privacy Policy'),
+                            onTap: () => _showComingSoon(context, 'Privacy Policy'),
                           ),
                           _SettingsItem(
                             icon: Icons.share_outlined,
                             title: 'Share This App',
-                            onTap: () => _showComingSoon('Share This App'),
+                            onTap: () => _showComingSoon(context, 'Share This App'),
                           ),
-
                           const SizedBox(height: 18),
 
-                          // Log Out button
+                          // Log Out
                           SizedBox(
                             width: double.infinity,
                             height: 44,
                             child: ElevatedButton(
-                              onPressed: _handleLogout,
+                              onPressed: () => _handleLogout(context),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFFEDED),
                                 foregroundColor: Colors.red,
@@ -259,21 +239,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               child: const Text(
                                 'Log Out',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                               ),
                             ),
                           ),
-
                           const SizedBox(height: 12),
                         ],
                       ),
                     ),
                   ),
 
-                  // Bottom nav bar
                   _BottomNavBar(),
                 ],
               ),
@@ -306,10 +281,7 @@ class _StatItem extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: Color(0xFF8A8A8A)),
-        ),
+        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF8A8A8A))),
       ],
     );
   }
@@ -390,10 +362,7 @@ class _SettingsItem extends StatelessWidget {
                   if (subtitle != null)
                     Text(
                       subtitle!,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        color: Color(0xFF9A9A9A),
-                      ),
+                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF9A9A9A)),
                     ),
                 ],
               ),
@@ -474,11 +443,7 @@ class _NavItem extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: selected ? Colors.black : const Color(0xFFB0B0B0),
-          ),
+          Icon(icon, size: 20, color: selected ? Colors.black : const Color(0xFFB0B0B0)),
           const SizedBox(height: 2),
           Text(
             label,
