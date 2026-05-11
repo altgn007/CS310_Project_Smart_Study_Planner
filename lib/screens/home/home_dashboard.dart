@@ -1,8 +1,9 @@
 // lib/screens/home/home_dashboard.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
-import '../../data/dummy_users.dart';
 import '../../models/course.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../add_course/add_course_screen.dart';
 import '../session/daily_session_screen.dart';
@@ -16,7 +17,6 @@ class HomeDashboard extends StatefulWidget {
 }
 
 class _HomeDashboardState extends State<HomeDashboard> {
-  // Convert mock data to Course model objects — this is the Card+List list
   late List<Course> _courses;
 
   @override
@@ -38,9 +38,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // Get logged-in user name from DummyUsersRepository if available
-    final String userName = ModalRoute.of(context)?.settings.arguments as String?
-     ?? DummyUsersRepository.users.first.fullName;
+    final String userName = context.watch<AuthProvider>().displayName;
 
     return PhoneCard(
       child: Column(
@@ -55,14 +53,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   const SizedBox(height: 8),
                   _buildHeader(userName),
                   const SizedBox(height: 16),
-                  // Network image banner
                   _buildNetworkBanner(),
                   const SizedBox(height: 16),
                   _buildTodayGoalsCard(),
                   const SizedBox(height: 16),
                   _buildSectionTitle('My Courses'),
                   const SizedBox(height: 10),
-                  // Card list with remove — uses Course model
                   ..._courses.asMap().entries.map(
                     (entry) => _buildCourseCard(entry.value, entry.key),
                   ),
@@ -115,7 +111,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ],
           ),
         ),
-        // Asset image — local avatar placeholder
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.asset(
@@ -123,14 +118,18 @@ class _HomeDashboardState extends State<HomeDashboard> {
             width: 40,
             height: 40,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            errorBuilder: (_, _, _) => Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
                 color: const Color(0xFFE0E0E0),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.person_outline, color: Colors.grey, size: 20),
+              child: const Icon(
+                Icons.person_outline,
+                color: Colors.grey,
+                size: 20,
+              ),
             ),
           ),
         ),
@@ -154,16 +153,23 @@ class _HomeDashboardState extends State<HomeDashboard> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black)),
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.black,
+              ),
+            ),
           );
         },
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (_, _, _) => Container(
           height: 80,
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Center(child: Icon(Icons.menu_book_outlined, color: Colors.grey)),
+          child: const Center(
+            child: Icon(Icons.menu_book_outlined, color: Colors.grey),
+          ),
         ),
       ),
     );
@@ -193,16 +199,25 @@ class _HomeDashboardState extends State<HomeDashboard> {
           const SizedBox(height: 10),
           ...mockTodaySessions.asMap().entries.map((entry) {
             final session = entry.value;
-            final colors = [AppColors.green, AppColors.yellow, AppColors.orange];
+            final colors = [
+              AppColors.green,
+              AppColors.yellow,
+              AppColors.orange,
+            ];
             final dotColor = colors[entry.key % colors.length];
             return GestureDetector(
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => DailySessionScreen(session: session)),
+                MaterialPageRoute(
+                  builder: (_) => DailySessionScreen(session: session),
+                ),
               ),
               child: Container(
                 margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.07),
                   borderRadius: BorderRadius.circular(100),
@@ -213,16 +228,27 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       width: 7,
                       height: 7,
                       margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: dotColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                     Expanded(
                       child: Text(
                         '${session['course']} · ${session['topic']} · ${session['duration']}',
-                        style: const TextStyle(fontSize: 11, color: Colors.white, fontFamily: 'Sora'),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontFamily: 'Sora',
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(Icons.play_arrow, color: Colors.white54, size: 14),
+                    const Icon(
+                      Icons.play_arrow,
+                      color: Colors.white54,
+                      size: 14,
+                    ),
                   ],
                 ),
               ),
@@ -237,7 +263,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return Text(title.toUpperCase(), style: AppTextStyles.sectionLabel);
   }
 
-  // Card widget using Course model with remove button
   Widget _buildCourseCard(Course course, int index) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -263,7 +288,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Exam: ${course.examDate}',
+                    'Exam: ${course.examDateLabel}',
                     style: AppTextStyles.bodySmall,
                   ),
                   const SizedBox(height: 6),
@@ -275,7 +300,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           child: LinearProgressIndicator(
                             value: course.progress,
                             backgroundColor: AppColors.border,
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.black),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.black,
+                            ),
                             minHeight: 4,
                           ),
                         ),
@@ -296,7 +323,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
               ),
             ),
             const SizedBox(width: 8),
-            // Days left chip
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -314,7 +340,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
               ),
             ),
             const SizedBox(width: 6),
-            // Remove button
             GestureDetector(
               onTap: () => _showRemoveDialog(course.name, index),
               child: Container(
@@ -338,7 +363,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Remove Course', style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700)),
+        title: const Text(
+          'Remove Course',
+          style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
+        ),
         content: Text(
           'Remove "$courseName" from your courses?',
           style: const TextStyle(fontFamily: 'Sora'),
@@ -346,14 +374,20 @@ class _HomeDashboardState extends State<HomeDashboard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.mutedText, fontFamily: 'Sora')),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.mutedText, fontFamily: 'Sora'),
+            ),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               _removeCourse(index);
             },
-            child: const Text('Remove', style: TextStyle(color: Colors.red, fontFamily: 'Sora')),
+            child: const Text(
+              'Remove',
+              style: TextStyle(color: Colors.red, fontFamily: 'Sora'),
+            ),
           ),
         ],
       ),
@@ -365,7 +399,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => Navigator.pushNamed(context, AddCourseScreen.routeName),
+            onTap: () =>
+                Navigator.pushNamed(context, AddCourseScreen.routeName),
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
@@ -375,7 +410,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
               child: const Center(
                 child: Text(
                   '+ Add Course',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white, fontFamily: 'Sora'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    fontFamily: 'Sora',
+                  ),
                 ),
               ),
             ),
@@ -394,7 +434,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
               child: const Center(
                 child: Text(
                   'AI Coach',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.black, fontFamily: 'Sora'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.black,
+                    fontFamily: 'Sora',
+                  ),
                 ),
               ),
             ),
