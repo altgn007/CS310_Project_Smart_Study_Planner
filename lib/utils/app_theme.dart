@@ -101,8 +101,14 @@ class AppPadding {
   AppPadding._();
 
   static const EdgeInsets screen = EdgeInsets.symmetric(horizontal: 18);
-  static const EdgeInsets card = EdgeInsets.symmetric(horizontal: 18, vertical: 16);
-  static const EdgeInsets inputContent = EdgeInsets.symmetric(horizontal: 18, vertical: 16);
+  static const EdgeInsets card = EdgeInsets.symmetric(
+    horizontal: 18,
+    vertical: 16,
+  );
+  static const EdgeInsets inputContent = EdgeInsets.symmetric(
+    horizontal: 18,
+    vertical: 16,
+  );
   static const EdgeInsets buttonVertical = EdgeInsets.symmetric(vertical: 14);
 }
 
@@ -127,7 +133,11 @@ class AppDecorations {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(color: AppColors.hint, fontSize: 13, fontFamily: 'Sora'),
+      hintStyle: const TextStyle(
+        color: AppColors.hint,
+        fontSize: 13,
+        fontFamily: 'Sora',
+      ),
       filled: true,
       fillColor: AppColors.cardWhite,
       contentPadding: AppPadding.inputContent,
@@ -234,7 +244,11 @@ class AppBottomNav extends StatelessWidget {
             onTap: () {
               if (!selected) {
                 if (i == 0) {
-                  Navigator.pushNamedAndRemoveUntil(context, item.$3, (r) => false);
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    item.$3,
+                    (r) => false,
+                  );
                 } else {
                   Navigator.pushNamed(context, item.$3);
                 }
@@ -243,9 +257,18 @@ class AppBottomNav extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(item.$1, size: 20, color: selected ? AppColors.black : AppColors.navInactive),
+                Icon(
+                  item.$1,
+                  size: 20,
+                  color: selected ? AppColors.black : AppColors.navInactive,
+                ),
                 const SizedBox(height: 2),
-                Text(item.$2, style: selected ? AppTextStyles.navLabelActive : AppTextStyles.navLabel),
+                Text(
+                  item.$2,
+                  style: selected
+                      ? AppTextStyles.navLabelActive
+                      : AppTextStyles.navLabel,
+                ),
               ],
             ),
           );
