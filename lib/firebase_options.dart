@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -48,6 +45,15 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDMgFa9QdV-uh3hTBNb53mwTq2CW-uCInY',
+    appId: '1:391252002391:web:ced4b5e5469ffe4c140512',
+    messagingSenderId: '391252002391',
+    projectId: 'smart-study-planner-cs310',
+    storageBucket: 'smart-study-planner-cs310.firebasestorage.app',
+    authDomain: 'smart-study-planner-cs310.firebaseapp.com',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDMgFa9QdV-uh3hTBNb53mwTq2CW-uCInY',
