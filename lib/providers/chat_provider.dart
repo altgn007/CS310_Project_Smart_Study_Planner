@@ -19,8 +19,8 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider({
     required FirestoreService firestoreService,
     required AiService aiService,
-  })  : _firestore = firestoreService,
-        _ai = aiService;
+  }) : _firestore = firestoreService,
+       _ai = aiService;
 
   final FirestoreService _firestore;
   final AiService _ai;
