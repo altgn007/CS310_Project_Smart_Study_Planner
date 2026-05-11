@@ -3,57 +3,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Users ────────────────────────────────────────────────────────────
-    // Each user may only read and write their own profile document.
-    // The document id equals the Firebase Auth uid.
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // ── Courses ──────────────────────────────────────────────────────────
-    // A course is private to the user who created it.
-    match /courses/{courseId} {
-      allow read, update, delete: if request.auth != null
-        && request.auth.uid == resource.data.createdBy;
-
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.createdBy
-        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
-    }
-
-    // ── Sessions ─────────────────────────────────────────────────────────
-    match /sessions/{sessionId} {
-      allow read, update, delete: if request.auth != null
-        && request.auth.uid == resource.data.createdBy;
-
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.createdBy
-        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
-    }
-
-    // ── Notifications ─────────────────────────────────────────────────────
-    match /notifications/{notificationId} {
-      allow read, update, delete: if request.auth != null
-        && request.auth.uid == resource.data.createdBy;
-
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.createdBy
-        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
-    }
-
-    // ── Chats ─────────────────────────────────────────────────────────────
-    match /chats/{chatId} {
-      allow read, delete: if request.auth != null
-        && request.auth.uid == resource.data.createdBy;
-
-      allow create: if request.auth != null
-        && request.auth.uid == request.resource.data.createdBy
-        && request.resource.data.keys().hasAll(['id', 'createdBy', 'createdAt']);
-    }
-
-    // Deny everything else by default.
+    // This rule allows anyone with your Firestore database reference to view, edit,
+    // and delete all data in your Firestore database. It is useful for getting
+    // started, but it is configured to expire after 30 days because it
+    // leaves your app open to attackers. At that time, all client
+    // requests to your Firestore database will be denied.
+    //
+    // Make sure to write security rules for your app before that time, or else
+    // all client requests to your Firestore database will be denied until you Update
+    // your rules
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if request.time < timestamp.date(2026, 6, 10);
     }
   }
 }
