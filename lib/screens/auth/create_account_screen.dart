@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_users.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
 
 class CreateAccountScreen extends StatefulWidget {
@@ -40,80 +41,53 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     );
 
     if (pickedDate != null) {
-      final String formattedDate =
-          '${pickedDate.day.toString().padLeft(2, '0')}/'
-          '${pickedDate.month.toString().padLeft(2, '0')}/'
-          '${pickedDate.year}';
-
       setState(() {
-        _selectedDate = formattedDate;
+        _selectedDate =
+            '${pickedDate.day.toString().padLeft(2, '0')}/'
+            '${pickedDate.month.toString().padLeft(2, '0')}/'
+            '${pickedDate.year}';
       });
     }
   }
 
-  void _submitForm() {
-    final bool isFormValid = _formKey.currentState!.validate();
-
+  Future<void> _submitForm() async {
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select your date of birth.'),
-        ),
+        const SnackBar(content: Text('Please select your date of birth.')),
       );
       return;
     }
+    if (!_formKey.currentState!.validate()) return;
 
-    if (!isFormValid) return;
-
-    final String email = _emailController.text.trim();
-
-    if (DummyUsersRepository.emailExists(email)) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Account already exists'),
-          content: const Text(
-            'An account with this email already exists. Please use another email.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    final DummyUser newUser = DummyUser(
-      fullName: _fullNameController.text.trim(),
-      email: email,
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.signUp(
+      email: _emailController.text.trim(),
       password: _passwordController.text.trim(),
-      dateOfBirth: _selectedDate!,
+      fullName: _fullNameController.text.trim(),
       educationLevel: _selectedEducationLevel,
+      dateOfBirth: _selectedDate,
     );
 
-    DummyUsersRepository.addUser(newUser);
+    if (!mounted) return;
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Account created'),
-        content: const Text(
-          'Your account has been created successfully.',
+    if (ok) {
+      // AuthGate will automatically navigate to home — just pop back to let it
+      // take over, or push login so the user sees they need to sign in.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created! Welcome.'),
+          backgroundColor: Colors.green,
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
+      );
+      // AuthGate handles navigation automatically once signed in.
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.errorMessage ?? 'Could not create account.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
   }
 
   InputDecoration _inputDecoration({
@@ -122,40 +96,26 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFFA0A0A0),
-        fontSize: 13,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFFA0A0A0), fontSize: 13),
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Color(0xFFE2E2E2),
-        ),
+        borderSide: const BorderSide(color: Color(0xFFE2E2E2)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.black,
-        ),
+        borderSide: const BorderSide(color: Colors.black),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.red,
-        ),
+        borderSide: const BorderSide(color: Colors.red),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(28),
-        borderSide: const BorderSide(
-          color: Colors.red,
-        ),
+        borderSide: const BorderSide(color: Colors.red),
       ),
     );
   }
@@ -185,6 +145,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<AuthProvider>().isLoading;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: SafeArea(
@@ -240,15 +202,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       children: [
                         const Text(
                           'Already registered? ',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF8A8A8A),
-                          ),
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFF8A8A8A)),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-                          },
+                          onTap: () => Navigator.pushReplacementNamed(
+                            context,
+                            LoginScreen.routeName,
+                          ),
                           child: const Text(
                             'Log in here.',
                             style: TextStyle(
@@ -280,14 +240,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration:
-                          _inputDecoration(hintText: 'you@university.edu'),
+                      decoration: _inputDecoration(hintText: 'you@university.edu'),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your email.';
                         }
-                        final emailRegex =
-                            RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                        final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
                         if (!emailRegex.hasMatch(value.trim())) {
                           return 'Please enter a valid email.';
                         }
@@ -340,16 +298,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       items: _educationLevels.map((level) {
                         return DropdownMenuItem<String>(
                           value: level,
-                          child: Text(
-                            level,
-                            style: const TextStyle(fontSize: 13),
-                          ),
+                          child: Text(level, style: const TextStyle(fontSize: 13)),
                         );
                       }).toList(),
                       onChanged: (value) {
-                        setState(() {
-                          _selectedEducationLevel = value!;
-                        });
+                        setState(() => _selectedEducationLevel = value!);
                       },
                     ),
                     const SizedBox(height: 22),
@@ -357,7 +310,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _submitForm,
+                        onPressed: isLoading ? null : _submitForm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -366,13 +319,22 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                             borderRadius: BorderRadius.circular(28),
                           ),
                         ),
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Sign Up',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                   ],
