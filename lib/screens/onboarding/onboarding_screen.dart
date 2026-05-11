@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_study_planner/services/prefs_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -17,7 +18,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     {
       'title': 'Plan Smarter,\nStudy Better',
       'description':
-          'Add your courses and exam dates. We’ll automatically build a personalised study schedule that adapts when life gets in the way.',
+          "Add your courses and exam dates. We'll automatically build a personalised study schedule that adapts when life gets in the way.",
       'icon': 'schedule',
     },
     {
@@ -34,18 +35,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     },
   ];
 
-  void _nextPage() {
+  void _nextPage() async {
     if (_currentIndex < _pages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     } else {
+      await PrefsService().writeOnboardingDone(true);
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/create-account');
     }
   }
 
-  void _skipOnboarding() {
+  void _skipOnboarding() async {
+    await PrefsService().writeOnboardingDone(true);
+    if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/create-account');
   }
 
@@ -78,16 +83,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           height: 82,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(
-              color: const Color(0xFFD9D9D9),
-              width: 1.2,
-            ),
+            border: Border.all(color: const Color(0xFFD9D9D9), width: 1.2),
           ),
-          child: Icon(
-            iconData,
-            size: 38,
-            color: const Color(0xFF222222),
-          ),
+          child: Icon(iconData, size: 38, color: const Color(0xFF222222)),
         ),
       ),
     );
