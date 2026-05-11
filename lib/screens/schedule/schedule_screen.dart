@@ -1,7 +1,11 @@
 // lib/screens/schedule/schedule_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../models/course.dart';
+import '../../models/study_session.dart';
+import '../../providers/course_provider.dart';
+import '../../providers/session_provider.dart';
 import '../../utils/app_theme.dart';
-import '../../data/mock_data.dart';
 import '../session/daily_session_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -13,7 +17,7 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  int _tabIndex = 0; // 0 = Schedule, 1 = Progress
+  int _tabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -29,11 +33,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Schedule', style: AppTextStyles.screenTitle),
-                    Text('April 2026', style: AppTextStyles.bodySmall),
+                    Text(
+                      _monthYear(DateTime.now()),
+                      style: AppTextStyles.bodySmall,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Schedule / Progress tab switcher
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.surface,
@@ -86,27 +92,50 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Widget _buildScheduleTab() {
-    return SingleChildScrollView(
-      padding: AppPadding.screen,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          Text('TODAY', style: AppTextStyles.sectionLabel),
-          const SizedBox(height: 8),
-          ...mockTodaySessions.map((s) => _sessionBlock(s)),
-          const SizedBox(height: 16),
-        ],
-      ),
+    return StreamBuilder<List<StudySession>>(
+      stream: context.read<SessionProvider>().todaySessionsStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
+          );
+        }
+
+        final sessions = snap.data ?? [];
+
+        return SingleChildScrollView(
+          padding: AppPadding.screen,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              Text('TODAY', style: AppTextStyles.sectionLabel),
+              const SizedBox(height: 8),
+              if (sessions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No sessions scheduled for today.',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                )
+              else
+                ...sessions.map((s) => _sessionBlock(s)),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _sessionBlock(Map<String, dynamic> s) {
-    final urgent = s['urgent'] as bool;
+  Widget _sessionBlock(StudySession s) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => DailySessionScreen(session: s)),
+        MaterialPageRoute(
+          builder: (_) => DailySessionScreen(session: s.toSessionMap()),
+        ),
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -116,12 +145,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           borderRadius: const BorderRadius.only(
             topRight: Radius.circular(12),
             bottomRight: Radius.circular(12),
-            topLeft: Radius.zero,
-            bottomLeft: Radius.zero,
           ),
           border: Border(
             left: BorderSide(
-              color: urgent ? AppColors.urgent : AppColors.black,
+              color: s.urgent ? AppColors.urgent : AppColors.black,
               width: 3,
             ),
           ),
@@ -132,16 +159,34 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(s['course'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Sora')),
-                  Text(s['topic'], style: AppTextStyles.bodySmall),
-                  Text('${s['time']} · ${s['duration']}', style: AppTextStyles.bodySmall),
+                  Text(
+                    s.courseName,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Sora',
+                    ),
+                  ),
+                  Text(s.topic, style: AppTextStyles.bodySmall),
+                  Text('${s.time} · ${s.duration}', style: AppTextStyles.bodySmall),
                 ],
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: AppColors.black, borderRadius: BorderRadius.circular(100)),
-              child: const Text('▶ Start', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white, fontFamily: 'Sora')),
+              decoration: BoxDecoration(
+                color: AppColors.black,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: const Text(
+                '▶ Start',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontFamily: 'Sora',
+                ),
+              ),
             ),
           ],
         ),
@@ -150,28 +195,54 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Widget _buildProgressTab() {
-    return SingleChildScrollView(
-      padding: AppPadding.screen,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          // Stats
-          Row(
+    return StreamBuilder<List<Course>>(
+      stream: context.read<CourseProvider>().coursesStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.black),
+          );
+        }
+
+        final courses = snap.data ?? [];
+
+        return SingleChildScrollView(
+          padding: AppPadding.screen,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _statCard('12h', 'Studied'),
-              const SizedBox(width: 8),
-              _statCard('27🔥', 'Streak'),
-              const SizedBox(width: 8),
-              _statCard('74%', 'Done'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _statCard('${courses.length}', 'Courses'),
+                  const SizedBox(width: 8),
+                  _statCard(
+                    courses.isEmpty
+                        ? '0%'
+                        : '${((courses.map((c) => c.progress).reduce((a, b) => a + b) / courses.length) * 100).toInt()}%',
+                    'Avg Done',
+                  ),
+                  const SizedBox(width: 8),
+                  _statCard(
+                    courses.where((c) => c.urgent).length.toString(),
+                    'Urgent',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text('BY COURSE', style: AppTextStyles.sectionLabel),
+              const SizedBox(height: 8),
+              if (courses.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text('No courses yet.', style: AppTextStyles.bodySmall),
+                )
+              else
+                ...courses.map((c) => _courseProgress(c)),
             ],
           ),
-          const SizedBox(height: 14),
-          Text('BY COURSE', style: AppTextStyles.sectionLabel),
-          const SizedBox(height: 8),
-          ...mockCourses.map((c) => _courseProgress(c)),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -179,10 +250,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Column(
           children: [
-            Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, fontFamily: 'Sora')),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Sora',
+              ),
+            ),
             Text(label, style: AppTextStyles.bodySmall),
           ],
         ),
@@ -190,7 +271,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _courseProgress(Map<String, dynamic> c) {
+  Widget _courseProgress(Course c) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -199,15 +280,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(c['name'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Sora')),
-              Text('${((c['progress'] as double) * 100).toInt()}%', style: AppTextStyles.bodySmall),
+              Text(
+                c.name,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Sora',
+                ),
+              ),
+              Text('${(c.progress * 100).toInt()}%', style: AppTextStyles.bodySmall),
             ],
           ),
           const SizedBox(height: 4),
           ClipRRect(
             borderRadius: BorderRadius.circular(100),
             child: LinearProgressIndicator(
-              value: c['progress'] as double,
+              value: c.progress,
               backgroundColor: AppColors.border,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.black),
               minHeight: 5,
@@ -216,5 +304,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ],
       ),
     );
+  }
+
+  String _monthYear(DateTime d) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[d.month - 1]} ${d.year}';
   }
 }
