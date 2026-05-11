@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_study_planner/screens/notifications/notifications_screen.dart';
-import '../../data/dummy_users.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,9 +14,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Using first user as the logged-in user for now
-  DummyUser get _currentUser => DummyUsersRepository.users.first;
-
   void _handleLogout() {
     showDialog(
       context: context,
@@ -30,13 +29,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
+              await context.read<AuthProvider>().signOut();
             },
             child: const Text('Log Out', style: TextStyle(color: Colors.red)),
           ),
@@ -63,6 +58,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = themeProvider.isDark;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: SafeArea(
@@ -85,7 +84,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(34),
               child: Column(
                 children: [
-                  // Status bar
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 18,
@@ -106,15 +104,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-
-                  // Scrollable content
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Page title
                           const Text(
                             'Profile',
                             style: TextStyle(
@@ -123,10 +118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: Colors.black,
                             ),
                           ),
-
                           const SizedBox(height: 16),
-
-                          // Avatar + name + subtitle
                           Center(
                             child: Column(
                               children: [
@@ -145,7 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  _currentUser.fullName,
+                                  authProvider.displayName,
                                   style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
@@ -154,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${_currentUser.educationLevel} Student · Istanbul',
+                                  authProvider.profile?.email ?? '',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Color(0xFF8A8A8A),
@@ -163,10 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ],
                             ),
                           ),
-
                           const SizedBox(height: 16),
-
-                          // Stats row
                           Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
@@ -184,10 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ],
                             ),
                           ),
-
                           const SizedBox(height: 18),
-
-                          // ACCOUNT section
                           _SectionLabel(text: 'ACCOUNT'),
                           const SizedBox(height: 8),
                           _SettingsItem(
@@ -207,17 +193,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               );
                             },
                           ),
-
                           const SizedBox(height: 14),
-
-                          // GENERAL SETTINGS section
                           _SectionLabel(text: 'GENERAL SETTINGS'),
                           const SizedBox(height: 8),
-                          _SettingsItem(
-                            icon: Icons.contrast_outlined,
-                            title: 'Appearance',
-                            subtitle: 'Light / Dark mode',
-                            onTap: () => _showComingSoon('Appearance'),
+                          // Dark mode toggle
+                          Container(
+                            color: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF4F4F4),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.contrast_outlined,
+                                    size: 16,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Appearance',
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Light / Dark mode',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: Color(0xFF9A9A9A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Switch(
+                                  value: isDark,
+                                  onChanged: (_) => themeProvider.toggle(),
+                                  activeColor: Colors.black,
+                                ),
+                              ],
+                            ),
                           ),
                           _SettingsItem(
                             icon: Icons.language_outlined,
@@ -240,10 +268,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             title: 'Share This App',
                             onTap: () => _showComingSoon('Share This App'),
                           ),
-
                           const SizedBox(height: 18),
-
-                          // Log Out button
                           SizedBox(
                             width: double.infinity,
                             height: 44,
@@ -266,14 +291,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-
                           const SizedBox(height: 12),
                         ],
                       ),
                     ),
                   ),
-
-                  // Bottom nav bar
                   _BottomNavBar(),
                 ],
               ),
@@ -284,8 +306,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
-
-// ── Small reusable widgets ─────────────────────────────
 
 class _StatItem extends StatelessWidget {
   final String value;
