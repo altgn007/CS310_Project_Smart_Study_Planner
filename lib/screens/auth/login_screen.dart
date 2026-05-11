@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_users.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import 'create_account_screen.dart';
-import '../home/home_dashboard.dart';
-import '../home/home_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,49 +14,49 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  void _handleLogin() {
-    final bool isValid = _formKey.currentState!.validate();
-    if (!isValid) return;
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    final String email = _emailController.text.trim().toLowerCase();
-    final String password = _passwordController.text.trim();
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.signIn(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
 
-    DummyUser? matchedUser;
-
-    for (final user in DummyUsersRepository.users) {
-      if (user.email.toLowerCase() == email && user.password == password) {
-        matchedUser = user;
-        break;
-      }
-    }
-
-    if (matchedUser == null) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Login failed'),
-          content: const Text('Incorrect email or password. Please try again.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-
-              child: const Text('OK'),
-            ),
-          ],
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.errorMessage ?? 'Login failed. Please try again.'),
+          backgroundColor: Colors.red.shade700,
         ),
+      );
+    }
+    // On success AuthGate automatically navigates — no push needed.
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email above first.')),
       );
       return;
     }
-
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      HomeDashboard.routeName,
-      (route) => false,
-      arguments: matchedUser!.fullName,
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.sendPasswordResetEmail(email);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Password reset email sent.'
+              : (auth.errorMessage ?? 'Could not send reset email.'),
+        ),
+        backgroundColor: ok ? Colors.green.shade700 : Colors.red.shade700,
+      ),
     );
   }
 
@@ -111,6 +110,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<AuthProvider>().isLoading;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: SafeArea(
@@ -173,9 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: _inputDecoration(
-                        hintText: 'you@university.edu',
-                      ),
+                      decoration: _inputDecoration(hintText: 'you@university.edu'),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Please enter your email.';
@@ -207,23 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Forgot password'),
-                              content: const Text(
-                                'This feature is not connected to a real backend yet.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('OK'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                        onTap: isLoading ? null : _handleForgotPassword,
                         child: const Text(
                           'Forgot password?',
                           style: TextStyle(
@@ -239,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _handleLogin,
+                        onPressed: isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -248,13 +231,22 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(28),
                           ),
                         ),
-                        child: const Text(
-                          'log in',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'log in',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -269,12 +261,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.pushReplacementNamed(
-                              context,
-                              CreateAccountScreen.routeName,
-                            );
-                          },
+                          onTap: () => Navigator.pushReplacementNamed(
+                            context,
+                            CreateAccountScreen.routeName,
+                          ),
                           child: const Text(
                             'Create account',
                             style: TextStyle(
