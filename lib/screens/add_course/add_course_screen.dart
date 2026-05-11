@@ -1,5 +1,7 @@
 // lib/screens/add_course/add_course_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/course_provider.dart';
 import '../../utils/app_theme.dart';
 
 class AddCourseScreen extends StatefulWidget {
@@ -19,6 +21,7 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
   DateTime? _examDate;
   final List<String> _selectedDays = ['Mon', 'Tue', 'Thu', 'Fri'];
   final List<String> _allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -43,8 +46,7 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
     if (picked != null) setState(() => _examDate = picked);
   }
 
-  void _submit() {
-    // Validate exam date separately
+  Future<void> _submit() async {
     if (_examDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an exam date.')),
@@ -57,37 +59,68 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
       );
       return;
     }
-
-    // Validate form fields
     if (!_formKey.currentState!.validate()) return;
 
-    // Success — show AlertDialog
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Course Added!',
-          style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          '"${_courseController.text.trim()}" has been added. Your study plan will be generated automatically.',
-          style: const TextStyle(fontFamily: 'Sora'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context); // back to home
-            },
-            child: const Text(
-              'Go to Home',
-              style: TextStyle(color: AppColors.black, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
-            ),
+    setState(() => _isLoading = true);
+
+    final topics = _topicsController.text
+        .trim()
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    final course = await context.read<CourseProvider>().addCourse(
+          name: _courseController.text.trim(),
+          examDate: _examDate!,
+          priority: _selectedPriority,
+          topics: topics,
+          dailyHours: _dailyHours,
+          studyDays: List.from(_selectedDays),
+        );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (course != null) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text(
+            'Course Added!',
+            style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
           ),
-        ],
-      ),
-    );
+          content: Text(
+            '"${course.name}" has been saved to your study plan.',
+            style: const TextStyle(fontFamily: 'Sora'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Go to Home',
+                style: TextStyle(
+                  color: AppColors.black,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Sora',
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to save course. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -104,7 +137,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Back button
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: const Icon(Icons.arrow_back, size: 20, color: AppColors.black),
@@ -118,7 +150,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Course Name — with validation
                     _label('COURSE NAME'),
                     TextFormField(
                       controller: _courseController,
@@ -132,7 +163,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Exam Date
                     _label('EXAM DATE'),
                     GestureDetector(
                       onTap: _pickDate,
@@ -167,7 +197,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Priority
                     _label('PRIORITY LEVEL'),
                     Row(
                       children: ['High', 'Medium', 'Low'].map((p) {
@@ -202,7 +231,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Topics — with validation
                     _label('TOPICS / CHAPTERS'),
                     TextFormField(
                       controller: _topicsController,
@@ -219,7 +247,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Daily hours slider
                     _label('DAILY STUDY HOURS'),
                     Slider(
                       value: _dailyHours,
@@ -243,7 +270,6 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Study days
                     _label('STUDY DAYS'),
                     const SizedBox(height: 8),
                     Wrap(
@@ -286,9 +312,15 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _submit,
+                        onPressed: _isLoading ? null : _submit,
                         style: AppDecorations.primaryButton,
-                        child: const Text('Generate Study Plan', style: AppTextStyles.button),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text('Generate Study Plan', style: AppTextStyles.button),
                       ),
                     ),
                     const SizedBox(height: 16),
