@@ -1,30 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../data/dummy_notifications.dart';
+import 'package:provider/provider.dart';
+import '../../models/app_notification.dart';
+import '../../providers/notification_provider.dart';
 
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
   static const String routeName = '/notifications';
-
-  @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
-}
-
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  List<DummyNotification> get _notifications =>
-      DummyNotificationsRepository.notifications;
-
-  void _markAllRead() {
-    setState(() {
-      DummyNotificationsRepository.markAllAsRead();
-    });
-  }
-
-  void _markOneRead(String id) {
-    setState(() {
-      DummyNotificationsRepository.markAsRead(id);
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +55,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
 
                   // Header
-                  // Header
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     child: Row(
@@ -81,11 +62,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       children: [
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
-                          child: const Icon(
-                            Icons.arrow_back,
-                            size: 20,
-                            color: Colors.black,
-                          ),
+                          child: const Icon(Icons.arrow_back, size: 20, color: Colors.black),
                         ),
                         const Text(
                           'Notifications',
@@ -96,7 +73,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: _markAllRead,
+                          onTap: () => context.read<NotificationProvider>().markAllAsRead(),
                           child: const Text(
                             'Mark all read',
                             style: TextStyle(
@@ -112,22 +89,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // Notification list
+                  // Real-time notification list via StreamBuilder
                   Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      itemCount: _notifications.length,
-                      itemBuilder: (context, index) {
-                        final n = _notifications[index];
-                        return _NotificationTile(
-                          notification: n,
-                          onTap: () => _markOneRead(n.id),
+                    child: StreamBuilder<List<AppNotification>>(
+                      stream: context.read<NotificationProvider>().notificationsStream,
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          );
+                        }
+
+                        final notifications = snap.data ?? [];
+
+                        if (notifications.isEmpty) {
+                          return const Center(
+                            child: Text(
+                              'No notifications yet.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF9A9A9A),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          itemCount: notifications.length,
+                          itemBuilder: (context, index) {
+                            final n = notifications[index];
+                            return _NotificationTile(
+                              notification: n,
+                              onTap: () => context
+                                  .read<NotificationProvider>()
+                                  .markAsRead(n.id),
+                            );
+                          },
                         );
                       },
                     ),
                   ),
 
-                  // Bottom nav bar
                   _BottomNavBar(currentIndex: 0),
                 ],
               ),
@@ -140,7 +146,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 }
 
 class _NotificationTile extends StatelessWidget {
-  final DummyNotification notification;
+  final AppNotification notification;
   final VoidCallback onTap;
 
   const _NotificationTile({required this.notification, required this.onTap});
@@ -167,19 +173,14 @@ class _NotificationTile extends StatelessWidget {
                 height: 7,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: notification.isRead
-                      ? Colors.transparent
-                      : Colors.black,
+                  color: notification.isRead ? Colors.transparent : Colors.black,
                 ),
               ),
             ),
 
-            // Emoji
             Text(notification.emoji, style: const TextStyle(fontSize: 16)),
-
             const SizedBox(width: 8),
 
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,9 +189,7 @@ class _NotificationTile extends StatelessWidget {
                     notification.title,
                     style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: notification.isRead
-                          ? FontWeight.w600
-                          : FontWeight.w700,
+                      fontWeight: notification.isRead ? FontWeight.w600 : FontWeight.w700,
                       color: Colors.black,
                     ),
                   ),
@@ -205,11 +204,8 @@ class _NotificationTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    notification.time,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFFAAAAAA),
-                    ),
+                    notification.displayTime,
+                    style: const TextStyle(fontSize: 10, color: Color(0xFFAAAAAA)),
                   ),
                 ],
               ),
@@ -238,21 +234,9 @@ class _BottomNavBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _NavItem(icon: Icons.home_outlined, label: 'Home', selected: false),
-          _NavItem(
-            icon: Icons.calendar_today_outlined,
-            label: 'Schedule',
-            selected: false,
-          ),
-          _NavItem(
-            icon: Icons.chat_bubble_outline,
-            label: 'Coach',
-            selected: false,
-          ),
-          _NavItem(
-            icon: Icons.person_outline,
-            label: 'Profile',
-            selected: true,
-          ),
+          _NavItem(icon: Icons.calendar_today_outlined, label: 'Schedule', selected: false),
+          _NavItem(icon: Icons.chat_bubble_outline, label: 'Coach', selected: false),
+          _NavItem(icon: Icons.person_outline, label: 'Profile', selected: true),
         ],
       ),
     );
@@ -264,22 +248,14 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool selected;
 
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.selected,
-  });
+  const _NavItem({required this.icon, required this.label, required this.selected});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: selected ? Colors.black : const Color(0xFFB0B0B0),
-        ),
+        Icon(icon, size: 20, color: selected ? Colors.black : const Color(0xFFB0B0B0)),
         const SizedBox(height: 2),
         Text(
           label,
