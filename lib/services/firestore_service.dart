@@ -10,16 +10,18 @@ import '../models/study_session.dart';
 /// Single repository that mediates ALL Firestore access in the app.
 ///
 /// Every screen / provider goes through this service rather than touching
-/// `FirebaseFirestore.instance` directly. That gives us one place to:
-///   - shape collection paths (so we can move them later),
-///   - convert between domain models and Firestore docs,
-///   - apply security-rule-friendly defaults (`createdBy`, `createdAt`).
+/// `FirebaseFirestore.instance` directly.
 ///
-/// All read methods return [Stream]s so the UI can `StreamBuilder` over
-/// them and update in real time when Firestore data changes.
+/// IMPORTANT (the fix): every read query now uses ONLY a single
+/// `where('createdBy', isEqualTo: userId)` filter — which Firestore indexes
+/// automatically — and performs all ordering / extra filtering CLIENT-SIDE
+/// in Dart. The previous code combined `where(...)` with `orderBy(...)` on a
+/// different field, which requires a manually-created composite index;
+/// without it Firestore throws and the UI showed "Could not load ...".
+/// Sorting in Dart removes that external setup requirement entirely.
 class FirestoreService {
   FirestoreService({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+    : _db = db ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -39,20 +41,16 @@ class FirestoreService {
   // USERS
   // ════════════════════════════════════════════════════════════════════
 
-  /// Create the user-profile document right after Firebase Auth sign-up.
-  /// The doc id is the auth uid so security rules can match by it.
   Future<void> createUserProfile(AppUser user) async {
     await _users.doc(user.id).set(user.toFirestore());
   }
 
-  /// One-shot read of a user profile.
   Future<AppUser?> fetchUserProfile(String uid) async {
     final snap = await _users.doc(uid).get();
     if (!snap.exists) return null;
     return AppUser.fromFirestore(snap);
   }
 
-  /// Real-time stream of the user-profile document.
   Stream<AppUser?> userProfileStream(String uid) {
     return _users.doc(uid).snapshots().map((doc) {
       if (!doc.exists) return null;
@@ -68,9 +66,6 @@ class FirestoreService {
   // COURSES — full CRUD + real-time stream
   // ════════════════════════════════════════════════════════════════════
 
-  /// Create a new course document. The `id` field on the doc is set to
-  /// the auto-generated doc id so we have it client-side too (and so
-  /// the spec's "unique id" requirement is satisfied inside the data).
   Future<Course> createCourse({
     required String userId,
     required String name,
@@ -97,13 +92,17 @@ class FirestoreService {
     return course;
   }
 
-  /// All courses for `userId`, freshest exam first. Live stream.
+  /// All courses for `userId`, soonest exam first. Live stream.
+  /// Single-field filter only → no composite index required.
+  /// Ordering by `examDate` is done client-side.
   Stream<List<Course>> coursesStream(String userId) {
-    return _courses
-        .where('createdBy', isEqualTo: userId)
-        .orderBy('examDate')
-        .snapshots()
-        .map((snap) => snap.docs.map(Course.fromFirestore).toList());
+    return _courses.where('createdBy', isEqualTo: userId).snapshots().map((
+      snap,
+    ) {
+      final list = snap.docs.map(Course.fromFirestore).toList();
+      list.sort((a, b) => a.examDate.compareTo(b.examDate));
+      return list;
+    });
   }
 
   Future<void> updateCourse(String courseId, Map<String, dynamic> patch) {
@@ -148,29 +147,35 @@ class FirestoreService {
     return session;
   }
 
-  /// Sessions scheduled for *today* (00:00 — 23:59:59) for this user.
-  /// Used by the "Today's Goals" card and Schedule screen.
+  /// Sessions scheduled for *today* for this user.
+  /// Single-field Firestore filter; the day-range filter + sort are done
+  /// client-side so no composite index is needed.
   Stream<List<StudySession>> todaySessionsStream(String userId) {
     final now = DateTime.now();
     final dayStart = DateTime(now.year, now.month, now.day);
     final dayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-    return _sessions
-        .where('createdBy', isEqualTo: userId)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(dayStart))
-        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(dayEnd))
-        .orderBy('date')
-        .snapshots()
-        .map((snap) => snap.docs.map(StudySession.fromFirestore).toList());
+    return _sessions.where('createdBy', isEqualTo: userId).snapshots().map((
+      snap,
+    ) {
+      final list = snap.docs
+          .map(StudySession.fromFirestore)
+          .where((s) => !s.date.isBefore(dayStart) && !s.date.isAfter(dayEnd))
+          .toList();
+      list.sort((a, b) => a.date.compareTo(b.date));
+      return list;
+    });
   }
 
-  /// All sessions for a user (used for stats / progress tab).
+  /// All sessions for a user (used for stats / progress), newest first.
   Stream<List<StudySession>> allSessionsStream(String userId) {
-    return _sessions
-        .where('createdBy', isEqualTo: userId)
-        .orderBy('date', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map(StudySession.fromFirestore).toList());
+    return _sessions.where('createdBy', isEqualTo: userId).snapshots().map((
+      snap,
+    ) {
+      final list = snap.docs.map(StudySession.fromFirestore).toList();
+      list.sort((a, b) => b.date.compareTo(a.date));
+      return list;
+    });
   }
 
   Future<void> updateSession(String sessionId, Map<String, dynamic> patch) {
@@ -218,28 +223,34 @@ class FirestoreService {
     return notif;
   }
 
+  /// Newest first — sorted client-side, no composite index needed.
   Stream<List<AppNotification>> notificationsStream(String userId) {
-    return _notifications
-        .where('createdBy', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map(AppNotification.fromFirestore).toList());
+    return _notifications.where('createdBy', isEqualTo: userId).snapshots().map(
+      (snap) {
+        final list = snap.docs.map(AppNotification.fromFirestore).toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      },
+    );
   }
 
   Future<void> markNotificationRead(String notificationId) {
     return _notifications.doc(notificationId).update({'isRead': true});
   }
 
-  /// Bulk-mark every unread notification of [userId] as read, in one batch
-  /// write so we don't fire dozens of individual updates.
+  /// Bulk-mark every unread notification as read. We query by the single
+  /// `createdBy` field and filter `isRead == false` in Dart (two equality
+  /// filters would otherwise need a composite index).
   Future<void> markAllNotificationsRead(String userId) async {
     final query = await _notifications
         .where('createdBy', isEqualTo: userId)
-        .where('isRead', isEqualTo: false)
         .get();
-    if (query.docs.isEmpty) return;
+    final unread = query.docs
+        .where((d) => (d.data()['isRead'] as bool? ?? false) == false)
+        .toList();
+    if (unread.isEmpty) return;
     final batch = _db.batch();
-    for (final doc in query.docs) {
+    for (final doc in unread) {
       batch.update(doc.reference, {'isRead': true});
     }
     await batch.commit();
@@ -253,8 +264,6 @@ class FirestoreService {
   // CHATS (AI Coach conversation history)
   // ════════════════════════════════════════════════════════════════════
 
-  /// Append a new chat message (user or assistant) and return the persisted
-  /// model. The doc id is the auto-generated reference id.
   Future<ChatMessage> createChatMessage({
     required String userId,
     required String role,
@@ -272,20 +281,17 @@ class FirestoreService {
     return msg;
   }
 
-  /// Live stream of the user's chat history, oldest → newest.
+  /// Live chat history, oldest → newest (sorted client-side).
   Stream<List<ChatMessage>> chatMessagesStream(String userId) {
-    return _chats
-        .where('createdBy', isEqualTo: userId)
-        .orderBy('createdAt')
-        .snapshots()
-        .map((snap) => snap.docs.map(ChatMessage.fromFirestore).toList());
+    return _chats.where('createdBy', isEqualTo: userId).snapshots().map((snap) {
+      final list = snap.docs.map(ChatMessage.fromFirestore).toList();
+      list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return list;
+    });
   }
 
-  /// Delete every chat message owned by `userId` — used by the "Clear chat"
-  /// action on the coach screen.
   Future<void> clearChatHistory(String userId) async {
-    final query =
-        await _chats.where('createdBy', isEqualTo: userId).get();
+    final query = await _chats.where('createdBy', isEqualTo: userId).get();
     if (query.docs.isEmpty) return;
     final batch = _db.batch();
     for (final doc in query.docs) {

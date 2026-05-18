@@ -1,5 +1,8 @@
 // lib/screens/add_course/add_course_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../providers/course_provider.dart';
 import '../../utils/app_theme.dart';
 
 class AddCourseScreen extends StatefulWidget {
@@ -17,8 +20,17 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
   String _selectedPriority = 'High';
   double _dailyHours = 2.0;
   DateTime? _examDate;
+  bool _saving = false;
   final List<String> _selectedDays = ['Mon', 'Tue', 'Thu', 'Fri'];
-  final List<String> _allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final List<String> _allDays = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun',
+  ];
 
   @override
   void dispose() {
@@ -43,8 +55,7 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
     if (picked != null) setState(() => _examDate = picked);
   }
 
-  void _submit() {
-    // Validate exam date separately
+  Future<void> _submit() async {
     if (_examDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an exam date.')),
@@ -57,37 +68,83 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
       );
       return;
     }
-
-    // Validate form fields
     if (!_formKey.currentState!.validate()) return;
 
-    // Success — show AlertDialog
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Course Added!',
-          style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          '"${_courseController.text.trim()}" has been added. Your study plan will be generated automatically.',
-          style: const TextStyle(fontFamily: 'Sora'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context); // back to home
-            },
-            child: const Text(
-              'Go to Home',
-              style: TextStyle(color: AppColors.black, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
-            ),
+    // Parse "Chapter 1, Chapter 2" → ['Chapter 1', 'Chapter 2']
+    final topics = _topicsController.text
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    setState(() => _saving = true);
+
+    try {
+      // ACTUALLY persist to Firestore via the provider. The provider
+      // stamps `createdBy` with the signed-in user's uid automatically.
+      final created = await context.read<CourseProvider>().addCourse(
+        name: _courseController.text.trim(),
+        examDate: _examDate!,
+        priority: _selectedPriority,
+        topics: topics,
+        dailyHours: _dailyHours,
+        studyDays: List<String>.from(_selectedDays),
+      );
+
+      if (!mounted) return;
+
+      if (created == null) {
+        // addCourse returns null only when there is no logged-in user.
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You must be signed in to add a course.'),
           ),
-        ],
-      ),
-    );
+        );
+        return;
+      }
+
+      setState(() => _saving = false);
+
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: const Text(
+            'Course Added!',
+            style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
+          ),
+          content: Text(
+            '"${_courseController.text.trim()}" has been added to your courses.',
+            style: const TextStyle(fontFamily: 'Sora'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Go to Home',
+                style: TextStyle(
+                  color: AppColors.black,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Sora',
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // back to home — stream shows the new course
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not add course: $e')));
+    }
   }
 
   @override
@@ -104,10 +161,13 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Back button
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.arrow_back, size: 20, color: AppColors.black),
+                      child: const Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: AppColors.black,
+                      ),
                     ),
                     const SizedBox(height: 14),
                     const Text('Add Course', style: AppTextStyles.heading),
@@ -118,31 +178,40 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Course Name — with validation
                     _label('COURSE NAME'),
                     TextFormField(
                       controller: _courseController,
                       style: const TextStyle(fontSize: 13, fontFamily: 'Sora'),
-                      decoration: AppDecorations.inputField(hintText: 'e.g. Mathematics'),
+                      decoration: AppDecorations.inputField(
+                        hintText: 'e.g. Mathematics',
+                      ),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Please enter a course name.';
-                        if (v.trim().length < 2) return 'Course name must be at least 2 characters.';
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Please enter a course name.';
+                        }
+                        if (v.trim().length < 2) {
+                          return 'Course name must be at least 2 characters.';
+                        }
                         return null;
                       },
                     ),
                     const SizedBox(height: 12),
 
-                    // Exam Date
                     _label('EXAM DATE'),
                     GestureDetector(
                       onTap: _pickDate,
                       child: Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           border: Border.all(
-                            color: _examDate == null ? AppColors.border : AppColors.black,
+                            color: _examDate == null
+                                ? AppColors.border
+                                : AppColors.black,
                           ),
                           borderRadius: BorderRadius.circular(28),
                         ),
@@ -156,18 +225,23 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontFamily: 'Sora',
-                                  color: _examDate == null ? AppColors.hint : AppColors.black,
+                                  color: _examDate == null
+                                      ? AppColors.hint
+                                      : AppColors.black,
                                 ),
                               ),
                             ),
-                            const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.labelText),
+                            const Icon(
+                              Icons.calendar_today_outlined,
+                              size: 16,
+                              color: AppColors.labelText,
+                            ),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 12),
 
-                    // Priority
                     _label('PRIORITY LEVEL'),
                     Row(
                       children: ['High', 'Medium', 'Low'].map((p) {
@@ -176,12 +250,18 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                           child: GestureDetector(
                             onTap: () => setState(() => _selectedPriority = p),
                             child: Container(
-                              margin: EdgeInsets.only(right: p == 'Low' ? 0 : 8),
+                              margin: EdgeInsets.only(
+                                right: p == 'Low' ? 0 : 8,
+                              ),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: selected ? AppColors.black : Colors.transparent,
+                                color: selected
+                                    ? AppColors.black
+                                    : Colors.transparent,
                                 border: Border.all(
-                                  color: selected ? AppColors.black : AppColors.border,
+                                  color: selected
+                                      ? AppColors.black
+                                      : AppColors.border,
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -192,7 +272,9 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   fontFamily: 'Sora',
-                                  color: selected ? Colors.white : AppColors.black,
+                                  color: selected
+                                      ? Colors.white
+                                      : AppColors.black,
                                 ),
                               ),
                             ),
@@ -202,24 +284,30 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Topics — with validation
                     _label('TOPICS / CHAPTERS'),
                     TextFormField(
                       controller: _topicsController,
                       style: const TextStyle(fontSize: 13, fontFamily: 'Sora'),
-                      decoration: AppDecorations.inputField(hintText: 'e.g. Chapter 1, Chapter 2...'),
+                      decoration: AppDecorations.inputField(
+                        hintText: 'e.g. Chapter 1, Chapter 2...',
+                      ),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Please enter at least one topic.';
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Please enter at least one topic.';
+                        }
                         return null;
                       },
                     ),
                     const Text(
                       'Separate topics with commas',
-                      style: TextStyle(fontSize: 10, color: AppColors.mutedText, fontFamily: 'Sora'),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: AppColors.mutedText,
+                        fontFamily: 'Sora',
+                      ),
                     ),
                     const SizedBox(height: 12),
 
-                    // Daily hours slider
                     _label('DAILY STUDY HOURS'),
                     Slider(
                       value: _dailyHours,
@@ -233,17 +321,34 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('0.5h', style: TextStyle(fontSize: 10, color: AppColors.mutedText, fontFamily: 'Sora')),
+                        const Text(
+                          '0.5h',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.mutedText,
+                            fontFamily: 'Sora',
+                          ),
+                        ),
                         Text(
                           '${_dailyHours.toStringAsFixed(1)}h',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Sora',
+                          ),
                         ),
-                        const Text('6h', style: TextStyle(fontSize: 10, color: AppColors.mutedText, fontFamily: 'Sora')),
+                        const Text(
+                          '6h',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.mutedText,
+                            fontFamily: 'Sora',
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // Study days
                     _label('STUDY DAYS'),
                     const SizedBox(height: 8),
                     Wrap(
@@ -253,15 +358,21 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                         final selected = _selectedDays.contains(day);
                         return GestureDetector(
                           onTap: () => setState(() {
-                            selected ? _selectedDays.remove(day) : _selectedDays.add(day);
+                            selected
+                                ? _selectedDays.remove(day)
+                                : _selectedDays.add(day);
                           }),
                           child: Container(
                             width: 34,
                             height: 34,
                             decoration: BoxDecoration(
-                              color: selected ? AppColors.black : Colors.transparent,
+                              color: selected
+                                  ? AppColors.black
+                                  : Colors.transparent,
                               border: Border.all(
-                                color: selected ? AppColors.black : AppColors.border,
+                                color: selected
+                                    ? AppColors.black
+                                    : AppColors.border,
                               ),
                               shape: BoxShape.circle,
                             ),
@@ -272,7 +383,9 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   fontFamily: 'Sora',
-                                  color: selected ? Colors.white : AppColors.black,
+                                  color: selected
+                                      ? Colors.white
+                                      : AppColors.black,
                                 ),
                               ),
                             ),
@@ -286,9 +399,21 @@ class _AddCourseScreenState extends State<AddCourseScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _submit,
+                        onPressed: _saving ? null : _submit,
                         style: AppDecorations.primaryButton,
-                        child: const Text('Generate Study Plan', style: AppTextStyles.button),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Generate Study Plan',
+                                style: AppTextStyles.button,
+                              ),
                       ),
                     ),
                     const SizedBox(height: 16),
