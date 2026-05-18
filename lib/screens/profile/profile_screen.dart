@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:smart_study_planner/screens/notifications/notifications_screen.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/auth_gate.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,12 +18,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handleLogout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Log out'),
         content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text(
               'Cancel',
               style: TextStyle(color: Color(0xFF7A7A7A)),
@@ -30,8 +31,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              // 1. close the dialog
+              Navigator.pop(dialogContext);
+              // 2. actually sign out of Firebase
               await context.read<AuthProvider>().signOut();
+              if (!mounted) return;
+              // 3. rebuild AuthGate at the root → it sees no user and
+              //    routes to Login. Without this explicit navigation the
+              //    profile screen stays on top of the stack and "logout
+              //    does nothing" visually.
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AuthGate.routeName,
+                (route) => false,
+              );
             },
             child: const Text('Log Out', style: TextStyle(color: Colors.red)),
           ),
@@ -74,7 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(34),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -196,7 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 14),
                           _SectionLabel(text: 'GENERAL SETTINGS'),
                           const SizedBox(height: 8),
-                          // Dark mode toggle
                           Container(
                             color: Colors.transparent,
                             padding: const EdgeInsets.symmetric(vertical: 9),

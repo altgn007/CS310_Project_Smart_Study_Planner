@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smart_study_planner/services/prefs_service.dart';
+import 'package:smart_study_planner/screens/auth/login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -35,28 +36,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     },
   ];
 
-  void _nextPage() async {
+  Future<void> _goToLogin() async {
+    await PrefsService().writeOnboardingDone(true);
+    if (!mounted) return;
+    // Onboarding → Login (per requirement). From Login the user can tap
+    // "Create account" to register.
+    Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+  }
+
+  void _nextPage() {
     if (_currentIndex < _pages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     } else {
-      await PrefsService().writeOnboardingDone(true);
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/create-account');
+      _goToLogin();
     }
   }
 
-  void _skipOnboarding() async {
-    await PrefsService().writeOnboardingDone(true);
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(context, '/create-account');
+  void _previousPage() {
+    if (_currentIndex > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Widget _buildTopIllustration(String iconType) {
     IconData iconData;
-
     switch (iconType) {
       case 'check':
         iconData = Icons.task_alt_rounded;
@@ -120,6 +129,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final showBack = _currentIndex > 0;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: SafeArea(
@@ -133,7 +144,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               borderRadius: BorderRadius.circular(34),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -141,33 +152,58 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             child: Column(
               children: [
+                // Top row: a real Back button (left) appears from page 2.
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text(
-                      '9:41',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
+                  children: [
+                    SizedBox(
+                      width: 60,
+                      child: showBack
+                          ? GestureDetector(
+                              onTap: _previousPage,
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.arrow_back,
+                                    size: 16,
+                                    color: Colors.black,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Back',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : const Text(
+                              '9:41',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                              ),
+                            ),
                     ),
-                    Icon(Icons.more_horiz, size: 18, color: Colors.black),
+                    const Icon(Icons.more_horiz, size: 18, color: Colors.black),
                   ],
                 ),
                 const SizedBox(height: 14),
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
+                    // Default physics already allows swiping left AND
+                    // right between pages.
                     itemCount: _pages.length,
                     onPageChanged: (index) {
-                      setState(() {
-                        _currentIndex = index;
-                      });
+                      setState(() => _currentIndex = index);
                     },
                     itemBuilder: (context, index) {
                       final page = _pages[index];
-
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -199,33 +235,63 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 10),
                 _buildDots(),
                 const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _nextPage,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
+                Row(
+                  children: [
+                    if (showBack) ...[
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: _previousPage,
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFFD6D6D6)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                            child: const Text(
+                              'Back',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _nextPage,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                          ),
+                          child: Text(
+                            _currentIndex == _pages.length - 1
+                                ? 'Get Started'
+                                : 'Next',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    child: Text(
-                      _currentIndex == _pages.length - 1
-                          ? 'Get Started'
-                          : 'Next',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 TextButton(
-                  onPressed: _skipOnboarding,
+                  onPressed: _goToLogin,
                   child: const Text(
                     'Skip',
                     style: TextStyle(
