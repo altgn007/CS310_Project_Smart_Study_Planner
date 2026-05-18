@@ -1,18 +1,78 @@
 rules_version = '2';
-service cloud.firestone {
+
+service cloud.firestore {
   match /databases/{database}/documents {
-    match /studyPlans/{planId} {
-      //create
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.createdBy;
 
-      //read
-      allow read: if request.auth != null && request.auth.uid == resource.data.createdBy;
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-      //update
-      allow update: if request.auth != null && request.auth.uid == resource.data.createdBy;
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
 
-      //delete
-      allow delete: if request.auth != null && request.auth.uid == resource.data.createdBy;
+    function newDocOwnedBySelf() {
+      return isSignedIn() &&
+             request.resource.data.createdBy == request.auth.uid;
+    }
+
+    function ownershipUnchanged() {
+      return request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    match /users/{uid} {
+      allow read:   if isSignedIn();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+      allow delete: if isOwner(uid);
+    }
+
+    match /courses/{courseId} {
+      allow read:   if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+      allow create: if newDocOwnedBySelf();
+      allow update: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid &&
+                       ownershipUnchanged();
+      allow delete: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+    }
+
+    match /sessions/{sessionId} {
+      allow read:   if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+      allow create: if newDocOwnedBySelf();
+      allow update: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid &&
+                       ownershipUnchanged();
+      allow delete: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      allow read:   if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+      allow create: if newDocOwnedBySelf();
+      allow update: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid &&
+                       ownershipUnchanged();
+      allow delete: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+    }
+
+    match /chats/{chatId} {
+      allow read:   if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+      allow create: if newDocOwnedBySelf();
+      allow update: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid &&
+                       ownershipUnchanged();
+      allow delete: if isSignedIn() &&
+                       resource.data.createdBy == request.auth.uid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

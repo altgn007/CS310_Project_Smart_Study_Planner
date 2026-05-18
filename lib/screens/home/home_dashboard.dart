@@ -1,35 +1,29 @@
 // lib/screens/home/home_dashboard.dart
+//
+// GROUP A — final clean version.
+// "My Courses" reads real Firestore data via CourseProvider (StreamBuilder).
+// Mock data fully removed. Header avatar is aligned with the name and has a
+// notification bell next to it.
+//
+// NOTE: "Today's Goals" intentionally shows an empty state here. Wiring it
+// to real study sessions (plus streak / this-week stats and the Schedule
+// screen) is GROUP D work and will be done on the fix/group-d-schedule
+// branch.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../data/mock_data.dart';
+
 import '../../models/course.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/course_provider.dart';
 import '../../utils/app_theme.dart';
 import '../add_course/add_course_screen.dart';
-import '../session/daily_session_screen.dart';
+import '../notifications/notifications_screen.dart';
 
-class HomeDashboard extends StatefulWidget {
+class HomeDashboard extends StatelessWidget {
   static const String routeName = '/home';
   const HomeDashboard({super.key});
 
-  @override
-  State<HomeDashboard> createState() => _HomeDashboardState();
-}
-
-class _HomeDashboardState extends State<HomeDashboard> {
-  late List<Course> _courses;
-
-  @override
-  void initState() {
-    super.initState();
-    _courses = mockCourses.map((m) => Course.fromMap(m)).toList();
-  }
-
-  void _removeCourse(int index) {
-    setState(() => _courses.removeAt(index));
-  }
-
-  String get _greeting {
+  String _greeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good Morning ☀️';
     if (hour < 17) return 'Good Afternoon 🌤';
@@ -38,7 +32,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final String userName = context.watch<AuthProvider>().displayName;
+    final userName = context.watch<AuthProvider>().displayName;
+    final coursesStream = context.watch<CourseProvider>().coursesStream;
 
     return PhoneCard(
       child: Column(
@@ -51,29 +46,55 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
-                  _buildHeader(userName),
+                  _Header(greeting: _greeting(), name: userName),
                   const SizedBox(height: 16),
-                  _buildNetworkBanner(),
+                  const _NetworkBanner(),
                   const SizedBox(height: 16),
-                  _buildTodayGoalsCard(),
+                  const _TodayGoalsCard(),
                   const SizedBox(height: 16),
-                  _buildSectionTitle('My Courses'),
+                  Text('MY COURSES', style: AppTextStyles.sectionLabel),
                   const SizedBox(height: 10),
-                  ..._courses.asMap().entries.map(
-                    (entry) => _buildCourseCard(entry.value, entry.key),
-                  ),
-                  if (_courses.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'No courses yet. Add one below!',
-                          style: AppTextStyles.bodySmall,
-                        ),
-                      ),
+                  if (coursesStream == null)
+                    const _EmptyCourses()
+                  else
+                    StreamBuilder<List<Course>>(
+                      stream: coursesStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            !snapshot.hasData) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.black,
+                              ),
+                            ),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Text(
+                              'Could not load courses.',
+                              style: AppTextStyles.bodySmall,
+                            ),
+                          );
+                        }
+                        final courses = snapshot.data ?? const <Course>[];
+                        if (courses.isEmpty) {
+                          return const _EmptyCourses();
+                        }
+                        return Column(
+                          children: [
+                            for (final c in courses) _CourseCard(course: c),
+                          ],
+                        );
+                      },
                     ),
                   const SizedBox(height: 16),
-                  _buildQuickActions(),
+                  const _QuickActions(),
                   const SizedBox(height: 12),
                 ],
               ),
@@ -84,18 +105,26 @@ class _HomeDashboardState extends State<HomeDashboard> {
       ),
     );
   }
+}
 
-  Widget _buildHeader(String name) {
-    return Row(
+class _Header extends StatelessWidget {
+  const _Header({required this.greeting, required this.name});
+
+  final String greeting;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_greeting, style: AppTextStyles.bodySmall),
-              const SizedBox(height: 2),
-              Text(
+        Text(greeting, style: AppTextStyles.bodySmall),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
                 name,
                 style: const TextStyle(
                   fontSize: 20,
@@ -104,40 +133,87 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   fontFamily: 'Sora',
                 ),
               ),
-              Text(
-                '${mockTodaySessions.length} sessions today',
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
-          ),
-        ),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.asset(
-            'assets/images/avatar_placeholder.png',
-            width: 40,
-            height: 40,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0E0E0),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.person_outline,
-                color: Colors.grey,
-                size: 20,
+            ),
+            const _NotificationBell(hasUnread: false),
+            const SizedBox(width: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/images/avatar_placeholder.png',
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E0E0),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ],
     );
   }
+}
 
-  Widget _buildNetworkBanner() {
+class _NotificationBell extends StatelessWidget {
+  const _NotificationBell({required this.hasUnread});
+
+  final bool hasUnread;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, NotificationsScreen.routeName),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            const Icon(
+              Icons.notifications_none_rounded,
+              size: 20,
+              color: AppColors.black,
+            ),
+            if (hasUnread)
+              Positioned(
+                top: 9,
+                right: 9,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkBanner extends StatelessWidget {
+  const _NetworkBanner();
+
+  @override
+  Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Image.network(
@@ -174,8 +250,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
       ),
     );
   }
+}
 
-  Widget _buildTodayGoalsCard() {
+class _TodayGoalsCard extends StatelessWidget {
+  const _TodayGoalsCard();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -197,73 +278,27 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ),
           ),
           const SizedBox(height: 10),
-          ...mockTodaySessions.asMap().entries.map((entry) {
-            final session = entry.value;
-            final colors = [
-              AppColors.green,
-              AppColors.yellow,
-              AppColors.orange,
-            ];
-            final dotColor = colors[entry.key % colors.length];
-            return GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DailySessionScreen(session: session),
-                ),
-              ),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: dotColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        '${session['course']} · ${session['topic']} · ${session['duration']}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.white,
-                          fontFamily: 'Sora',
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Icon(
-                      Icons.play_arrow,
-                      color: Colors.white54,
-                      size: 14,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
+          Text(
+            'No study sessions scheduled for today.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[400],
+              fontFamily: 'Sora',
+            ),
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildSectionTitle(String title) {
-    return Text(title.toUpperCase(), style: AppTextStyles.sectionLabel);
-  }
+class _CourseCard extends StatelessWidget {
+  const _CourseCard({required this.course});
 
-  Widget _buildCourseCard(Course course, int index) {
+  final Course course;
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
@@ -341,7 +376,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ),
             const SizedBox(width: 6),
             GestureDetector(
-              onTap: () => _showRemoveDialog(course.name, index),
+              onTap: () => _confirmRemove(context),
               child: Container(
                 width: 26,
                 height: 26,
@@ -358,7 +393,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     );
   }
 
-  void _showRemoveDialog(String courseName, int index) {
+  void _confirmRemove(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -368,7 +403,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
           style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'Remove "$courseName" from your courses?',
+          'Remove "${course.name}" from your courses?',
           style: const TextStyle(fontFamily: 'Sora'),
         ),
         actions: [
@@ -380,9 +415,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              _removeCourse(index);
+              await context.read<CourseProvider>().deleteCourse(course.id);
             },
             child: const Text(
               'Remove',
@@ -393,8 +428,30 @@ class _HomeDashboardState extends State<HomeDashboard> {
       ),
     );
   }
+}
 
-  Widget _buildQuickActions() {
+class _EmptyCourses extends StatelessWidget {
+  const _EmptyCourses();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text(
+          'No courses yet. Add one below!',
+          style: AppTextStyles.bodySmall,
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
