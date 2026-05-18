@@ -1,9 +1,20 @@
+// lib/screens/auth/login_screen.dart
 import 'package:flutter/material.dart';
-import '../../data/dummy_users.dart';
-import 'create_account_screen.dart';
-import '../home/home_dashboard.dart';
-import '../home/home_dashboard.dart';
+import 'package:provider/provider.dart';
 
+import '../../providers/auth_provider.dart';
+import '../../widgets/auth_gate.dart';
+import 'create_account_screen.dart';
+
+/// Login screen — wired to REAL Firebase Auth through [AuthProvider].
+///
+/// Why we navigate to [AuthGate] on success:
+///   The onboarding / create-account screens use `pushReplacementNamed`,
+///   which removes AuthGate from the navigator stack. So relying on a
+///   still-mounted AuthGate to auto-route after login is unreliable.
+///   Instead, on success we rebuild AuthGate fresh at the root of the
+///   stack: it sees the now-signed-in user and shows Home. The same
+///   mechanism makes logout reliable (AuthGate sees no user → Login).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,36 +26,42 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  void _handleLogin() {
-    final bool isValid = _formKey.currentState!.validate();
-    if (!isValid) return;
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-    final String email = _emailController.text.trim().toLowerCase();
-    final String password = _passwordController.text.trim();
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    DummyUser? matchedUser;
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.signIn(
+      email: _emailController.text.trim().toLowerCase(),
+      password: _passwordController.text.trim(),
+    );
 
-    for (final user in DummyUsersRepository.users) {
-      if (user.email.toLowerCase() == email && user.password == password) {
-        matchedUser = user;
-        break;
-      }
-    }
+    if (!mounted) return;
 
-    if (matchedUser == null) {
+    if (!ok) {
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (ctx) => AlertDialog(
           title: const Text('Login failed'),
-          content: const Text('Incorrect email or password. Please try again.'),
+          content: Text(
+            auth.errorMessage ??
+                'Incorrect email or password. Please try again.',
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-
+              onPressed: () {
+                auth.clearError();
+                Navigator.pop(ctx);
+              },
               child: const Text('OK'),
             ),
           ],
@@ -53,11 +70,60 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Success → rebuild AuthGate at the root. It will see the signed-in
+    // user and route to Home.
     Navigator.pushNamedAndRemoveUntil(
       context,
-      HomeDashboard.routeName,
+      AuthGate.routeName,
       (route) => false,
-      arguments: matchedUser!.fullName,
+    );
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final email = _emailController.text.trim().toLowerCase();
+    if (email.isEmpty || !RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email)) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Forgot password'),
+          content: const Text(
+            'Enter your email in the field above first, then tap '
+            '"Forgot password?" again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.sendPasswordResetEmail(email);
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ok ? 'Email sent' : 'Could not send email'),
+        content: Text(
+          ok
+              ? 'A password reset link has been sent to $email.'
+              : (auth.errorMessage ?? 'Please try again later.'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              auth.clearError();
+              Navigator.pop(ctx);
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -103,14 +169,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<AuthProvider>().isLoading;
+
+    // Explicit black input text — fixes the pink text (it was inheriting
+    // a themed color).
+    const inputTextStyle = TextStyle(fontSize: 13, color: Colors.black);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: SafeArea(
@@ -124,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(34),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -135,9 +200,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
+                      children: [
                         Text(
                           '9:41',
                           style: TextStyle(
@@ -173,6 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(
                         hintText: 'you@university.edu',
                       ),
@@ -192,6 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: true,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(hintText: '••••••••'),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -207,23 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Forgot password'),
-                              content: const Text(
-                                'This feature is not connected to a real backend yet.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('OK'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                        onTap: isLoading ? null : _handleForgotPassword,
                         child: const Text(
                           'Forgot password?',
                           style: TextStyle(
@@ -239,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: _handleLogin,
+                        onPressed: isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -248,13 +299,22 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(28),
                           ),
                         ),
-                        child: const Text(
-                          'log in',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'log in',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 14),

@@ -54,7 +54,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 
   Future<void> _submitForm() async {
-    final bool isFormValid = _formKey.currentState!.validate();
+    // Validate the form FIRST (fixes the old ordering where the date
+    // check ran before the form-valid check).
+    if (!_formKey.currentState!.validate()) return;
 
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -63,13 +65,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       return;
     }
 
-    if (!isFormValid) return;
-
     setState(() => _isLoading = true);
 
     final authProvider = context.read<AuthProvider>();
+    // signUp() → Firebase createUserWithEmailAndPassword. Firebase Auth
+    // itself rejects a duplicate email with 'email-already-in-use', which
+    // AuthService converts to "An account with this email already exists."
+    // So the "no two accounts with the same email" rule is enforced here.
     final success = await authProvider.signUp(
-      email: _emailController.text.trim(),
+      email: _emailController.text.trim().toLowerCase(),
       password: _passwordController.text.trim(),
       fullName: _fullNameController.text.trim(),
       educationLevel: _selectedEducationLevel,
@@ -83,14 +87,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authProvider.errorMessage ?? 'Sign up failed.')),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account created successfully!')),
-      );
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/auth-gate');
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account created successfully!')),
+    );
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    // Rebuild AuthGate at the root → it sees the new signed-in user and
+    // routes straight to Home.
+    Navigator.pushNamedAndRemoveUntil(context, '/auth-gate', (route) => false);
   }
 
   InputDecoration _inputDecoration({
@@ -148,6 +155,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const inputTextStyle = TextStyle(fontSize: 13, color: Colors.black);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),
       body: SafeArea(
@@ -161,7 +170,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               borderRadius: BorderRadius.circular(34),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -172,9 +181,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
+                      children: [
                         Text(
                           '9:41',
                           style: TextStyle(
@@ -228,6 +237,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     _buildLabel('NAME'),
                     TextFormField(
                       controller: _fullNameController,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(hintText: 'Your full name'),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -244,6 +254,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(
                         hintText: 'you@university.edu',
                       ),
@@ -263,6 +274,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: true,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(hintText: '••••••••'),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -279,6 +291,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     TextFormField(
                       readOnly: true,
                       onTap: _pickDate,
+                      style: inputTextStyle,
                       decoration: _inputDecoration(
                         hintText: _selectedDate ?? 'Select',
                         suffixIcon: const Padding(
@@ -329,8 +342,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           ),
                         ),
                         child: _isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
                               )
                             : const Text(
                                 'Sign Up',
