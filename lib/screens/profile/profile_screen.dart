@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_study_planner/screens/notifications/notifications_screen.dart';
+import '../../models/course.dart';
+import '../../models/study_session.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/course_provider.dart';
+import '../../providers/session_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../utils/sessions_stats.dart';
 import '../../widgets/auth_gate.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -31,15 +36,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              // 1. close the dialog
               Navigator.pop(dialogContext);
-              // 2. actually sign out of Firebase
               await context.read<AuthProvider>().signOut();
               if (!mounted) return;
-              // 3. rebuild AuthGate at the root → it sees no user and
-              //    routes to Login. Without this explicit navigation the
-              //    profile screen stays on top of the stack and "logout
-              //    does nothing" visually.
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AuthGate.routeName,
@@ -169,23 +168,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF7F7F7),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: const [
-                                _StatItem(value: '3', label: 'Courses'),
-                                _Divider(),
-                                _StatItem(value: '27', label: 'Day Streak'),
-                                _Divider(),
-                                _StatItem(value: '12h', label: 'This Week'),
-                              ],
-                            ),
-                          ),
+
+                          // ── Real stats panel ─────────────────────
+                          const _StatsPanel(),
+
                           const SizedBox(height: 18),
                           _SectionLabel(text: 'ACCOUNT'),
                           const SizedBox(height: 8),
@@ -319,6 +305,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+/// Live "Courses · Day Streak · This Week" panel.
+///
+/// Listens to coursesStream and allSessionsStream and recomputes the
+/// numbers on the client via [SessionStats]. No more hard-coded values.
+class _StatsPanel extends StatelessWidget {
+  const _StatsPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final coursesStream = context.watch<CourseProvider>().coursesStream;
+    final sessionsStream = context.watch<SessionProvider>().allSessionsStream;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: StreamBuilder<List<Course>>(
+        stream: coursesStream,
+        builder: (context, courseSnap) {
+          final courseCount = courseSnap.data?.length ?? 0;
+          return StreamBuilder<List<StudySession>>(
+            stream: sessionsStream,
+            builder: (context, sessionSnap) {
+              final sessions = sessionSnap.data ?? const <StudySession>[];
+              final streak = SessionStats.currentStreak(sessions);
+              final thisWeek = SessionStats.thisWeekStudied(sessions);
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _StatItem(value: '$courseCount', label: 'Courses'),
+                  const _Divider(),
+                  _StatItem(value: '$streak', label: 'Day Streak'),
+                  const _Divider(),
+                  _StatItem(value: thisWeek, label: 'This Week'),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _StatItem extends StatelessWidget {
   final String value;
   final String label;
@@ -358,7 +390,6 @@ class _Divider extends StatelessWidget {
 
 class _SectionLabel extends StatelessWidget {
   final String text;
-
   const _SectionLabel({required this.text});
 
   @override
