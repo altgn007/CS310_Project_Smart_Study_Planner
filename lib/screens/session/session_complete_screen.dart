@@ -1,14 +1,26 @@
 // lib/screens/session/session_complete_screen.dart
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
-import '../../utils/app_theme.dart';
-import 'daily_session_screen.dart';
 
+import '../../models/study_session.dart';
+import '../../utils/app_theme.dart';
+
+/// Shown after a session is marked complete.
+///
+/// Takes the REAL [StudySession] (not a `Map`) plus the actual
+/// `oldCourseProgress` / `newCourseProgress` that the daily-session
+/// screen computed and persisted, so the "X% → Y%" bar is truthful
+/// instead of the hard-coded 40%→55% it used to show.
+///
+/// The "Up next" section was driven by `mockTodaySessions`, which never
+/// belonged to this user — removed. Streak is intentionally not shown
+/// here yet; it will be wired up in D3.
 class SessionCompleteScreen extends StatelessWidget {
-  final Map<String, dynamic> session;
+  final StudySession session;
   final int topicsDone;
   final int totalTopics;
   final int timeSpentSeconds;
+  final double oldCourseProgress;
+  final double newCourseProgress;
 
   const SessionCompleteScreen({
     super.key,
@@ -16,6 +28,8 @@ class SessionCompleteScreen extends StatelessWidget {
     required this.topicsDone,
     required this.totalTopics,
     required this.timeSpentSeconds,
+    required this.oldCourseProgress,
+    required this.newCourseProgress,
   });
 
   String get _timeDisplay {
@@ -26,18 +40,11 @@ class SessionCompleteScreen extends StatelessWidget {
     return rem == 0 ? '${h}h' : '${h}h ${rem}m';
   }
 
-  Map<String, dynamic>? get _nextSession {
-    final idx = mockTodaySessions.indexWhere(
-      (s) => s['course'] == session['course'] && s['topic'] == session['topic'],
-    );
-    if (idx != -1 && idx + 1 < mockTodaySessions.length) return mockTodaySessions[idx + 1];
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final next = _nextSession;
-    final allDone = topicsDone == totalTopics;
+    final allDone = totalTopics > 0 && topicsDone == totalTopics;
+    final oldPct = (oldCourseProgress * 100).round();
+    final newPct = (newCourseProgress * 100).round();
 
     return PhoneCard(
       child: Column(
@@ -48,7 +55,6 @@ class SessionCompleteScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
             child: Column(
               children: [
-                // Completion ring
                 SizedBox(
                   width: 72,
                   height: 72,
@@ -59,10 +65,16 @@ class SessionCompleteScreen extends StatelessWidget {
                         value: totalTopics == 0 ? 1 : topicsDone / totalTopics,
                         strokeWidth: 5,
                         backgroundColor: Colors.white12,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
                         strokeCap: StrokeCap.round,
                       ),
-                      const Icon(Icons.check_rounded, color: Colors.white, size: 28),
+                      const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ],
                   ),
                 ),
@@ -78,13 +90,16 @@ class SessionCompleteScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${session['course']} — ${session['topic']}',
+                  '${session.courseName} — ${session.topic}',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500], fontFamily: 'Sora'),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                    fontFamily: 'Sora',
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 14),
-                // Stats row
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.white12),
@@ -94,7 +109,12 @@ class SessionCompleteScreen extends StatelessWidget {
                     children: [
                       _statCell('TIME', _timeDisplay, true),
                       _statCell('TOPICS', '$topicsDone/$totalTopics', true),
-                      _statCell('STREAK', '${mockStreak + 1}🔥', false, color: AppColors.green),
+                      _statCell(
+                        'PROGRESS',
+                        '$newPct%',
+                        false,
+                        color: AppColors.green,
+                      ),
                     ],
                   ),
                 ),
@@ -111,34 +131,41 @@ class SessionCompleteScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 14),
 
-                  // Progress update
-                  Text('${session['course']} PROGRESS'.toUpperCase(), style: AppTextStyles.sectionLabel),
+                  Text(
+                    '${session.courseName} PROGRESS'.toUpperCase(),
+                    style: AppTextStyles.sectionLabel,
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Text('40%', style: AppTextStyles.bodySmall),
+                      Text('$oldPct%', style: AppTextStyles.bodySmall),
                       const SizedBox(width: 8),
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(100),
-                          child: const LinearProgressIndicator(
-                            value: 0.55,
+                          child: LinearProgressIndicator(
+                            value: newCourseProgress,
                             backgroundColor: AppColors.border,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.black),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.black,
+                            ),
                             minHeight: 6,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
-                        '→ 55%',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
+                      Text(
+                        '→ $newPct%',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Sora',
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
 
-                  // Coach note
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -155,93 +182,48 @@ class SessionCompleteScreen extends StatelessWidget {
                             color: AppColors.black,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 14),
+                          child: const Icon(
+                            Icons.chat_bubble_outline,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             allDone
                                 ? 'Great work! All topics covered. Keep the momentum going.'
-                                : "Good progress — $topicsDone/$totalTopics topics done. Remaining topics moved to tomorrow.",
-                            style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.mutedText, fontFamily: 'Sora'),
+                                : "Good progress — $topicsDone/$totalTopics topics done. Pick up the rest in your next session.",
+                            style: const TextStyle(
+                              fontSize: 11,
+                              height: 1.5,
+                              color: AppColors.mutedText,
+                              fontFamily: 'Sora',
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 18),
 
-                  // Up next
-                  if (next != null) ...[
-                    Text('UP NEXT', style: AppTextStyles.sectionLabel),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  next['course'],
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'Sora'),
-                                ),
-                                Text(
-                                  '${next['time']} · ${next['duration']}',
-                                  style: AppTextStyles.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => DailySessionScreen(session: next)),
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.black,
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: const Text(
-                                '▶ Start',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white, fontFamily: 'Sora'),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-
-                  // Buttons
-                  if (next != null)
-                    _primaryBtn('Start Next Session', () => Navigator.pushReplacement(
+                  _primaryBtn(
+                    'Back to Home',
+                    () => Navigator.pushNamedAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (_) => DailySessionScreen(session: next)),
-                    )),
-                  const SizedBox(height: 8),
-                  _outlineBtn('Back to Home', () => Navigator.pushNamedAndRemoveUntil(context, '/home', (r) => false)),
-
-                  if (!allDone) ...[
-                    const SizedBox(height: 10),
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => Navigator.pushNamedAndRemoveUntil(context, '/home', (r) => false),
-                        child: const Text(
-                          "I didn't finish everything →",
-                          style: TextStyle(fontSize: 11, color: AppColors.mutedText, decoration: TextDecoration.underline, fontFamily: 'Sora'),
-                        ),
-                      ),
+                      '/home',
+                      (r) => false,
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 8),
+                  _outlineBtn(
+                    'Back to Schedule',
+                    () => Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/schedule',
+                      (r) => false,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                 ],
               ),
@@ -257,7 +239,9 @@ class SessionCompleteScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          border: right ? const Border(right: BorderSide(color: Colors.white12)) : null,
+          border: right
+              ? const Border(right: BorderSide(color: Colors.white12))
+              : null,
         ),
         child: Column(
           children: [
@@ -273,7 +257,12 @@ class SessionCompleteScreen extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: Colors.grey[500], fontFamily: 'Sora'),
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[500],
+                fontFamily: 'Sora',
+              ),
             ),
           ],
         ),
@@ -300,7 +289,15 @@ class SessionCompleteScreen extends StatelessWidget {
         side: const BorderSide(color: AppColors.border, width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.black, fontFamily: 'Sora')),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.black,
+          fontFamily: 'Sora',
+        ),
+      ),
     ),
   );
 }

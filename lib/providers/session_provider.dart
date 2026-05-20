@@ -4,11 +4,9 @@ import 'package:flutter/foundation.dart';
 import '../models/study_session.dart';
 import '../services/firestore_service.dart';
 
-/// Same shape as [CourseProvider]: keeps a warm cache of "today's" sessions
-/// and exposes the raw stream for `StreamBuilder` consumers.
 class SessionProvider extends ChangeNotifier {
   SessionProvider({required FirestoreService firestoreService})
-      : _firestore = firestoreService;
+    : _firestore = firestoreService;
 
   final FirestoreService _firestore;
   String? _userId;
@@ -18,6 +16,9 @@ class SessionProvider extends ChangeNotifier {
 
   Stream<List<StudySession>>? get todaySessionsStream =>
       _userId == null ? null : _firestore.todaySessionsStream(_userId!);
+
+  Stream<List<StudySession>>? get upcomingSessionsStream =>
+      _userId == null ? null : _firestore.upcomingSessionsStream(_userId!);
 
   Stream<List<StudySession>>? get allSessionsStream =>
       _userId == null ? null : _firestore.allSessionsStream(_userId!);
@@ -35,7 +36,6 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  // ── CRUD ────────────────────────────────────────────────────────────
   Future<StudySession?> addSession({
     required String courseId,
     required String courseName,
@@ -77,5 +77,18 @@ class SessionProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> deleteSession(String id) => _firestore.deleteSession(id);
+  /// Delete a session and recompute its course's progress in one go.
+  /// Use this from UI delete buttons so progress stays consistent.
+  Future<void> deleteSession({
+    required String sessionId,
+    required String courseId,
+  }) async {
+    final uid = _userId;
+    if (uid == null) return;
+    await _firestore.deleteSessionAndRecalc(
+      sessionId: sessionId,
+      courseId: courseId,
+      userId: uid,
+    );
+  }
 }

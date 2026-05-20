@@ -27,6 +27,7 @@ import 'services/firestore_service.dart';
 import 'services/prefs_service.dart';
 import 'utils/app_theme.dart';
 import 'widgets/auth_gate.dart';
+import 'screens/session/add_session_screen.dart';
 
 Future<void> main() async {
   // Initialize Flutter bindings before touching any plugin code.
@@ -163,6 +164,7 @@ class SmartStudyPlannerApp extends StatelessWidget {
             ScheduleScreen.routeName: (_) => const ScheduleScreen(),
             ProfileScreen.routeName: (_) => const ProfileScreen(),
             NotificationsScreen.routeName: (_) => const NotificationsScreen(),
+            AddSessionScreen.routeName: (_) => const AddSessionScreen(),
           },
         ),
       ),

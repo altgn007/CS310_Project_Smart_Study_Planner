@@ -1,23 +1,24 @@
 // lib/screens/home/home_dashboard.dart
 //
-// GROUP A — final clean version.
-// "My Courses" reads real Firestore data via CourseProvider (StreamBuilder).
-// Mock data fully removed. Header avatar is aligned with the name and has a
-// notification bell next to it.
-//
-// NOTE: "Today's Goals" intentionally shows an empty state here. Wiring it
-// to real study sessions (plus streak / this-week stats and the Schedule
-// screen) is GROUP D work and will be done on the fix/group-d-schedule
-// branch.
+// GROUP D — D3.
+// Today's Goals reads the user's real sessions for today (SessionProvider).
+// Tapping a pending session opens DailySessionScreen; a completed one is
+// shown as "✓ Done" and is non-interactive.
+// Notification bell shows a red dot when there are unread notifications.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/app_notification.dart';
 import '../../models/course.dart';
+import '../../models/study_session.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../providers/session_provider.dart';
 import '../../utils/app_theme.dart';
 import '../add_course/add_course_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../session/daily_session_screen.dart';
 
 class HomeDashboard extends StatelessWidget {
   static const String routeName = '/home';
@@ -115,6 +116,11 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the notification stream so the red dot updates live.
+    final notifStream = context
+        .watch<NotificationProvider>()
+        .notificationsStream;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -134,7 +140,17 @@ class _Header extends StatelessWidget {
                 ),
               ),
             ),
-            const _NotificationBell(hasUnread: false),
+            if (notifStream == null)
+              const _NotificationBell(hasUnread: false)
+            else
+              StreamBuilder<List<AppNotification>>(
+                stream: notifStream,
+                builder: (context, snap) {
+                  final list = snap.data ?? const <AppNotification>[];
+                  final hasUnread = list.any((n) => !n.isRead);
+                  return _NotificationBell(hasUnread: hasUnread);
+                },
+              ),
             const SizedBox(width: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -257,6 +273,8 @@ class _TodayGoalsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final todayStream = context.watch<SessionProvider>().todaySessionsStream;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -278,15 +296,102 @@ class _TodayGoalsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'No study sessions scheduled for today.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[400],
-              fontFamily: 'Sora',
+          if (todayStream == null)
+            _placeholder('Sign in to see today\'s goals.')
+          else
+            StreamBuilder<List<StudySession>>(
+              stream: todayStream,
+              builder: (context, snap) {
+                final sessions = snap.data ?? const <StudySession>[];
+                if (sessions.isEmpty) {
+                  return _placeholder('No study sessions scheduled for today.');
+                }
+                return Column(
+                  children: [
+                    for (int i = 0; i < sessions.length; i++)
+                      _GoalRow(session: sessions[i], accent: _accentFor(i)),
+                  ],
+                );
+              },
             ),
-          ),
         ],
+      ),
+    );
+  }
+
+  Color _accentFor(int i) {
+    const colors = [AppColors.green, AppColors.yellow, AppColors.orange];
+    return colors[i % colors.length];
+  }
+
+  Widget _placeholder(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        color: Colors.grey[400],
+        fontFamily: 'Sora',
+      ),
+    );
+  }
+}
+
+class _GoalRow extends StatelessWidget {
+  const _GoalRow({required this.session, required this.accent});
+
+  final StudySession session;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = session.done;
+    return GestureDetector(
+      onTap: () {
+        if (done) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DailySessionScreen(session: session),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: done ? Colors.white24 : accent,
+                shape: BoxShape.circle,
+              ),
+            ),
+            Expanded(
+              child: Text(
+                '${session.courseName} · ${session.topic} · ${session.duration}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: done ? Colors.white38 : Colors.white,
+                  fontFamily: 'Sora',
+                  decoration: done ? TextDecoration.lineThrough : null,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              done ? Icons.check_rounded : Icons.play_arrow,
+              color: done ? Colors.white38 : Colors.white54,
+              size: 14,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -403,7 +508,8 @@ class _CourseCard extends StatelessWidget {
           style: TextStyle(fontFamily: 'Sora', fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'Remove "${course.name}" from your courses?',
+          'Remove "${course.name}"?\n\n'
+          'All scheduled sessions for this course will also be deleted.',
           style: const TextStyle(fontFamily: 'Sora'),
         ),
         actions: [

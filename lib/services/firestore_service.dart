@@ -9,23 +9,15 @@ import '../models/study_session.dart';
 
 /// Single repository that mediates ALL Firestore access in the app.
 ///
-/// Every screen / provider goes through this service rather than touching
-/// `FirebaseFirestore.instance` directly.
-///
-/// IMPORTANT (the fix): every read query now uses ONLY a single
-/// `where('createdBy', isEqualTo: userId)` filter — which Firestore indexes
-/// automatically — and performs all ordering / extra filtering CLIENT-SIDE
-/// in Dart. The previous code combined `where(...)` with `orderBy(...)` on a
-/// different field, which requires a manually-created composite index;
-/// without it Firestore throws and the UI showed "Could not load ...".
-/// Sorting in Dart removes that external setup requirement entirely.
+/// Every read query uses ONLY a single `where('createdBy', isEqualTo: uid)`
+/// filter — no composite index required. Extra filtering/sorting is done
+/// client-side.
 class FirestoreService {
   FirestoreService({FirebaseFirestore? db})
     : _db = db ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
-  // ── Collection refs (typed) ─────────────────────────────────────────
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
   CollectionReference<Map<String, dynamic>> get _courses =>
@@ -63,7 +55,7 @@ class FirestoreService {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // COURSES — full CRUD + real-time stream
+  // COURSES
   // ════════════════════════════════════════════════════════════════════
 
   Future<Course> createCourse({
@@ -92,9 +84,6 @@ class FirestoreService {
     return course;
   }
 
-  /// All courses for `userId`, soonest exam first. Live stream.
-  /// Single-field filter only → no composite index required.
-  /// Ordering by `examDate` is done client-side.
   Stream<List<Course>> coursesStream(String userId) {
     return _courses.where('createdBy', isEqualTo: userId).snapshots().map((
       snap,
@@ -109,12 +98,31 @@ class FirestoreService {
     return _courses.doc(courseId).update(patch);
   }
 
-  Future<void> deleteCourse(String courseId) {
-    return _courses.doc(courseId).delete();
+  /// Delete a course AND every session that belonged to it.
+  ///
+  /// We use a batched write so all deletes either succeed or fail
+  /// together — nothing ends up half-cleaned. Without this, deleting
+  /// a course leaves orphan sessions in the Schedule referring to a
+  /// course that no longer exists.
+  Future<void> deleteCourse(String courseId) async {
+    final batch = _db.batch();
+
+    // Collect every session belonging to this course.
+    final sessions = await _sessions
+        .where('courseId', isEqualTo: courseId)
+        .get();
+    for (final doc in sessions.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // Finally delete the course itself.
+    batch.delete(_courses.doc(courseId));
+
+    await batch.commit();
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // SESSIONS — full CRUD + real-time stream
+  // SESSIONS
   // ════════════════════════════════════════════════════════════════════
 
   Future<StudySession> createSession({
@@ -147,17 +155,15 @@ class FirestoreService {
     return session;
   }
 
-  /// Sessions scheduled for *today* for this user.
-  /// Single-field Firestore filter; the day-range filter + sort are done
-  /// client-side so no composite index is needed.
+  /// Today's sessions only (00:00 — 23:59:59).
   Stream<List<StudySession>> todaySessionsStream(String userId) {
-    final now = DateTime.now();
-    final dayStart = DateTime(now.year, now.month, now.day);
-    final dayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
     return _sessions.where('createdBy', isEqualTo: userId).snapshots().map((
       snap,
     ) {
+      final now = DateTime.now();
+      final dayStart = DateTime(now.year, now.month, now.day);
+      final dayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
       final list = snap.docs
           .map(StudySession.fromFirestore)
           .where((s) => !s.date.isBefore(dayStart) && !s.date.isAfter(dayEnd))
@@ -167,7 +173,24 @@ class FirestoreService {
     });
   }
 
-  /// All sessions for a user (used for stats / progress), newest first.
+  /// Today + future sessions, sorted ascending. Used by Schedule screen.
+  Stream<List<StudySession>> upcomingSessionsStream(String userId) {
+    return _sessions.where('createdBy', isEqualTo: userId).snapshots().map((
+      snap,
+    ) {
+      final now = DateTime.now();
+      final dayStart = DateTime(now.year, now.month, now.day);
+
+      final list = snap.docs
+          .map(StudySession.fromFirestore)
+          .where((s) => !s.date.isBefore(dayStart))
+          .toList();
+      list.sort((a, b) => a.date.compareTo(b.date));
+      return list;
+    });
+  }
+
+  /// All sessions for the user, newest first.
   Stream<List<StudySession>> allSessionsStream(String userId) {
     return _sessions.where('createdBy', isEqualTo: userId).snapshots().map((
       snap,
@@ -182,8 +205,6 @@ class FirestoreService {
     return _sessions.doc(sessionId).update(patch);
   }
 
-  /// Mark a session as completed and bump the parent course's progress.
-  /// Wrapped in a transaction so the two updates are atomic.
   Future<void> markSessionComplete({
     required String sessionId,
     required String courseId,
@@ -195,12 +216,51 @@ class FirestoreService {
     });
   }
 
+  /// Delete a single session AND recompute its course's progress.
+  ///
+  /// Progress = (remaining done sessions for that course) / (course topics).
+  /// We read the parent course's topic count, count the remaining done
+  /// sessions for it, then write the new progress in one batched op so
+  /// the UI sees a consistent state.
+  Future<void> deleteSessionAndRecalc({
+    required String sessionId,
+    required String courseId,
+    required String userId,
+  }) async {
+    // Look up the parent course (we need its topic count).
+    final courseSnap = await _courses.doc(courseId).get();
+    final courseTopics = (courseSnap.data()?['topics'] as List?) ?? const [];
+    final totalTopics = courseTopics.isEmpty ? 1 : courseTopics.length;
+
+    // Count remaining DONE sessions for this course AFTER deletion.
+    final all = await _sessions.where('createdBy', isEqualTo: userId).get();
+    final remainingDone = all.docs.where((d) {
+      final m = d.data();
+      return d.id != sessionId &&
+          m['courseId'] == courseId &&
+          (m['done'] as bool? ?? false) == true;
+    }).length;
+
+    final newProgress = (remainingDone / totalTopics).clamp(0.0, 1.0);
+
+    final batch = _db.batch();
+    batch.delete(_sessions.doc(sessionId));
+    // Only patch the course if it still exists (avoid resurrecting it
+    // if the user deleted both at once).
+    if (courseSnap.exists) {
+      batch.update(_courses.doc(courseId), {'progress': newProgress});
+    }
+    await batch.commit();
+  }
+
+  /// Plain session delete WITHOUT progress recalc. Kept for callers that
+  /// don't need it (none right now, but useful for cascade flows).
   Future<void> deleteSession(String sessionId) {
     return _sessions.doc(sessionId).delete();
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // NOTIFICATIONS — full CRUD + real-time stream
+  // NOTIFICATIONS
   // ════════════════════════════════════════════════════════════════════
 
   Future<AppNotification> createNotification({
@@ -223,7 +283,6 @@ class FirestoreService {
     return notif;
   }
 
-  /// Newest first — sorted client-side, no composite index needed.
   Stream<List<AppNotification>> notificationsStream(String userId) {
     return _notifications.where('createdBy', isEqualTo: userId).snapshots().map(
       (snap) {
@@ -238,9 +297,6 @@ class FirestoreService {
     return _notifications.doc(notificationId).update({'isRead': true});
   }
 
-  /// Bulk-mark every unread notification as read. We query by the single
-  /// `createdBy` field and filter `isRead == false` in Dart (two equality
-  /// filters would otherwise need a composite index).
   Future<void> markAllNotificationsRead(String userId) async {
     final query = await _notifications
         .where('createdBy', isEqualTo: userId)
@@ -261,7 +317,7 @@ class FirestoreService {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // CHATS (AI Coach conversation history)
+  // CHATS
   // ════════════════════════════════════════════════════════════════════
 
   Future<ChatMessage> createChatMessage({
@@ -281,7 +337,6 @@ class FirestoreService {
     return msg;
   }
 
-  /// Live chat history, oldest → newest (sorted client-side).
   Stream<List<ChatMessage>> chatMessagesStream(String userId) {
     return _chats.where('createdBy', isEqualTo: userId).snapshots().map((snap) {
       final list = snap.docs.map(ChatMessage.fromFirestore).toList();
